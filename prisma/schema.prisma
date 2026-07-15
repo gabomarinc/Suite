@@ -8,25 +8,48 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id        String   @id // Kinde User ID
-  email     String   @unique
-  firstName String?
-  lastName  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String          @id // Kinde User ID
+  legacyId             String?         @unique // Original DB ID for reference
+  email                String          @unique
+  firstName            String?
+  lastName             String?
+  name                 String?         // Full name or username
+  image                String?
+  role                 String?         @default("USER")
+  plan                 String?         @default("free")
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  companyName          String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  
+  apps                 UserAppAccess[]
 }
 
 model App {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   name        String
   description String?
   url         String
   iconUrl     String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  
+  users       UserAppAccess[]
+}
+
+model UserAppAccess {
+  id        String   @id @default(cuid())
+  userId    String
+  appId     String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  app       App      @relation(fields: [appId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, appId])
 }
