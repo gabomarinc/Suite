@@ -60,121 +60,117 @@ export default async function DashboardHub() {
   // Current Date logic
   const dateOptions: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' };
   const currentDate = new Date().toLocaleDateString('es-ES', dateOptions).toUpperCase();
-
   return (
     <main className="main-content">
       <header className="header">
         <div className="date-badge">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
           {currentDate}
         </div>
         <h1>Hola, {user?.given_name || 'Kônsul'} 👋</h1>
-        <p>Hoy es un buen día para hacer crecer tu negocio.</p>
+        <p>Tu suite unificada de MicroSaaS. Inicia sesión una vez para acceder a todo.</p>
       </header>
 
       <div className="dashboard-grid">
-        {/* Dark Card */}
-        <div className="card card-dark">
-          <div className="card-header">
-            <div className="icon-wrapper">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+        {/* Bills Card */}
+        <a href="https://bills.konsul.digital/api/auth/login?prompt=none" className="card card-bills">
+          <div className="card-header-suite">
+            <div className="card-suite-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
             </div>
-            <div className="badge-green">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg>
-              En Camino
-            </div>
+            <span className="card-badge-status">
+              Activo
+            </span>
           </div>
-          <h3>Facturado este mes</h3>
-          <div className="amount">$0</div>
-          <div className="progress-container">
-            <div className="progress-bar">
-              <div className="progress-fill"></div>
-            </div>
-            <div className="progress-labels">
-              <span>$0</span>
-              <span>Meta: $5000</span>
-            </div>
+          <div className="card-body">
+            <h3>Kônsul Bills</h3>
+            <p>Facturación electrónica, reportes fiscales y gestión de gastos inteligente con IA.</p>
           </div>
-        </div>
-
-        {/* Green Card */}
-        <a href="https://saas1.konsul.com/api/auth/login?prompt=none" className="card card-green">
-          <div className="add-btn">+</div>
-          <h3>Crear Nuevo</h3>
-          <p>Factura, Cotización o Gasto.<br/>La IA te ayuda.</p>
-          <div className="arrow-link">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>
+          <div className="card-footer-suite">
+            <div className="quick-links">
+              <span className="quick-link-btn">Facturas</span>
+              <span className="quick-link-btn">Gastos</span>
+            </div>
+            <div className="arrow-suite-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            </div>
           </div>
         </a>
 
-        {/* White Card */}
-        <div className="card card-white">
-          <h3>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-            ESTADO
-          </h3>
-          <div className="tabs">
-            <div className="tab active">Facturas</div>
-            <div className="tab">Cotizaciones</div>
+        {/* Process Card */}
+        <a href="https://process.konsul.digital/api/auth/login?prompt=none" className="card card-process">
+          <div className="card-header-suite">
+            <div className="card-suite-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+            </div>
+            <span className="card-badge-status">
+              Activo
+            </span>
           </div>
-          <div className="state-list">
-            <div className="state-item">
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                Borradores
-              </span>
-              <span>0</span>
+          <div className="card-body">
+            <h3>Kônsul Process</h3>
+            <p>Gestión de flujos de trabajo, tableros Kanban y automatización de procesos internos.</p>
+          </div>
+          <div className="card-footer-suite">
+            <div className="quick-links">
+              <span className="quick-link-btn">Tableros</span>
+              <span className="quick-link-btn">Flujos</span>
             </div>
-            <div className="state-item blue">
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                Enviadas
-              </span>
-              <span className="count">0</span>
-            </div>
-            <div className="state-item">
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                Vistas
-              </span>
-              <span>2</span>
-            </div>
-            <div className="state-item purple">
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                Parciales
-              </span>
-              <span className="count">1</span>
+            <div className="arrow-suite-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
             </div>
           </div>
-        </div>
-      </div>
+        </a>
 
-      <div className="recent-activity">
-        <div className="section-header">
-          <h2>Actividad Reciente</h2>
-          <a href="#">Ver todo el historial</a>
-        </div>
-        <div className="activity-list">
-          <div className="activity-item">
-            <div className="activity-info">
-              <div className="activity-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-              </div>
-              <div className="activity-details">
-                <h4>Expresso changuinola</h4>
-                <p>11/6/2026 • Cotización</p>
-              </div>
+        {/* Reactivaleads Card */}
+        <a href="https://reactivaleads.konsul.digital/api/auth/login?prompt=none" className="card card-reactivaleads">
+          <div className="card-header-suite">
+            <div className="card-suite-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
             </div>
-            <div className="activity-meta">
-              <span className="activity-amount">$475</span>
-              <span className="badge-gray">Creada</span>
-              <button className="btn-action">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-              </button>
+            <span className="card-badge-status">
+              Activo
+            </span>
+          </div>
+          <div className="card-body">
+            <h3>Kônsul Reactivaleads</h3>
+            <p>Captación de clientes potenciales, campañas automatizadas de email y marketing inteligente.</p>
+          </div>
+          <div className="card-footer-suite">
+            <div className="quick-links">
+              <span className="quick-link-btn">Campañas</span>
+              <span className="quick-link-btn">Leads</span>
+            </div>
+            <div className="arrow-suite-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
             </div>
           </div>
-        </div>
+        </a>
+
+        {/* Kredit Card */}
+        <a href="https://kredit.konsul.digital/api/auth/login?prompt=none" className="card card-kredit">
+          <div className="card-header-suite">
+            <div className="card-suite-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            </div>
+            <span className="card-badge-status">
+              Activo
+            </span>
+          </div>
+          <div className="card-body">
+            <h3>Kônsul Kredit</h3>
+            <p>Evaluación de riesgo crediticio, análisis financiero rápido y solicitudes automatizadas.</p>
+          </div>
+          <div className="card-footer-suite">
+            <div className="quick-links">
+              <span className="quick-link-btn">Solicitudes</span>
+              <span className="quick-link-btn">Riesgo</span>
+            </div>
+            <div className="arrow-suite-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            </div>
+          </div>
+        </a>
       </div>
     </main>
   );
