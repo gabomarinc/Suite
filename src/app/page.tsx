@@ -20,16 +20,34 @@ export default async function DashboardHub() {
 
   if (user && user.id) {
     try {
+      const email = user.email || '';
+      // 1. Try finding by Kinde ID
+      let dbUser = await prisma.user.findUnique({ where: { id: user.id } });
+      
+      if (!dbUser && email) {
+        // 2. Not found by Kinde ID, check if exists by email (legacy imported user)
+        dbUser = await prisma.user.findUnique({ where: { email } });
+        
+        if (dbUser) {
+          // 3. Pair legacy user: Update their ID from temp to Kinde ID
+          // In Postgres we can update the primary key if there are no strict foreign key conflicts
+          await prisma.user.update({
+            where: { email },
+            data: { id: user.id }
+          });
+        }
+      }
+
+      // 4. Upsert with the Kinde ID to ensure data is fresh
       await prisma.user.upsert({
         where: { id: user.id },
         update: {
-          email: user.email || '',
           firstName: user.given_name,
           lastName: user.family_name,
         },
         create: {
           id: user.id,
-          email: user.email || '',
+          email: email,
           firstName: user.given_name,
           lastName: user.family_name,
         }
