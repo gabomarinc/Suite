@@ -27,7 +27,7 @@ export default async function RootLayout({
                 <img src="https://konsul.digital/images/Konsul-logo-general.png" alt="Kônsul" style={{ height: '48px' }} />
               </div>
               <nav className="sidebar-nav">
-                <a href="#" className="nav-item active">
+                <a href="/" className="nav-item">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
                   Inicio
                 </a>

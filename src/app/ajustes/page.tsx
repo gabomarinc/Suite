@@ -23,7 +23,6 @@ export default async function AjustesPage() {
   });
 
   if (!dbUser) {
-    // If not found, create a basic record just in case
     dbUser = await prisma.user.create({
       data: {
         id: kindeUser.id,
@@ -37,120 +36,131 @@ export default async function AjustesPage() {
   }
 
   return (
-    <main className="dashboard">
-      <header className="dashboard-header">
-        <div>
-          <h2>Ajustes de Cuenta</h2>
-          <p className="header-subtitle">Administra tu perfil personal y la configuración de tu empresa</p>
+    <main className="dashboard settings-page-wrapper">
+      
+      {/* Breadcrumbs & Header */}
+      <div className="settings-header-container">
+        <div className="settings-breadcrumbs">
+          <span>Inicio</span>
+          <span className="separator">/</span>
+          <span className="active">Configuración</span>
         </div>
-      </header>
-
-      <div className="settings-container" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', marginTop: '2rem' }}>
         
-        {/* Perfil Form */}
-        <section className="card card-white">
-          <div className="card-body">
-            <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>Información Personal</h3>
-            
-            <form action={updateUserProfile} className="settings-form" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label htmlFor="email" style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)' }}>Correo Electrónico (Solo Lectura)</label>
-                <input 
-                  type="email" 
-                  id="email" 
-                  name="email" 
-                  value={dbUser.email} 
-                  disabled 
-                  style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: '#f8fafc', color: 'var(--text-muted)' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label htmlFor="firstName" style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)' }}>Nombre</label>
-                  <input 
-                    type="text" 
-                    id="firstName" 
-                    name="firstName" 
-                    defaultValue={dbUser.firstName || ""} 
-                    placeholder="Tu nombre"
-                    style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}
-                  />
-                </div>
-                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label htmlFor="lastName" style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)' }}>Apellido</label>
-                  <input 
-                    type="text" 
-                    id="lastName" 
-                    name="lastName" 
-                    defaultValue={dbUser.lastName || ""} 
-                    placeholder="Tu apellido"
-                    style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label htmlFor="companyName" style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)' }}>Nombre de la Empresa</label>
-                <input 
-                  type="text" 
-                  id="companyName" 
-                  name="companyName" 
-                  defaultValue={dbUser.companyName || ""} 
-                  placeholder="Ej. Mi Agencia LLC"
-                  style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}
-                />
-              </div>
-
-              <div style={{ marginTop: '1rem' }}>
-                <button type="submit" className="btn-primary" style={{ padding: '0.75rem 2rem', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', border: 'none', background: 'var(--accent-blue)', color: 'white' }}>
-                  Guardar Cambios
-                </button>
-              </div>
-            </form>
+        <div className="settings-title-section">
+          <div>
+            <h2>Tu Espacio de Trabajo</h2>
+            <p className="header-subtitle">Personaliza tu perfil de la suite y administra tu suscripción activa.</p>
           </div>
-        </section>
+          
+          {/* Submit button linked to the form */}
+          <button type="submit" form="settings-form" className="btn-save-changes">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+            Guardar Cambios
+          </button>
+        </div>
+      </div>
 
-        {/* Suscripcion Info */}
-        <section className="card card-white" style={{ height: 'fit-content' }}>
-          <div className="card-body">
-            <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-              Suscripción
-            </h3>
+      <div className="settings-grid">
+        
+        {/* Left Side: Form */}
+        <div className="settings-main-col">
+          <form action={updateUserProfile} id="settings-form" className="card-premium">
+            <div className="card-premium-header">
+              <div className="card-icon-badge badge-green">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              </div>
+              <h3>El Rostro de tu Negocio</h3>
+            </div>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Plan Actual</p>
-                <div style={{ display: 'inline-flex', alignItems: 'center', padding: '0.25rem 0.75rem', background: dbUser.plan === 'free' ? '#f1f5f9' : '#dcfce7', color: dbUser.plan === 'free' ? 'var(--text-muted)' : '#166534', borderRadius: '100px', fontWeight: 700, fontSize: '0.85rem', textTransform: 'uppercase' }}>
-                  {dbUser.plan || "Free"}
+            <div className="card-premium-body">
+              <div className="input-group-full">
+                <label>CORREO ELECTRÓNICO (SOLO LECTURA)</label>
+                <div className="input-with-icon disabled">
+                  <div className="input-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                  </div>
+                  <input type="email" value={dbUser.email} disabled />
                 </div>
+              </div>
+
+              <div className="input-row-half">
+                <div className="input-group-half">
+                  <label>NOMBRE</label>
+                  <div className="input-with-icon">
+                    <div className="input-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    </div>
+                    <input type="text" name="firstName" defaultValue={dbUser.firstName || ""} placeholder="Nombre" />
+                  </div>
+                </div>
+                
+                <div className="input-group-half">
+                  <label>APELLIDO</label>
+                  <div className="input-with-icon">
+                    <div className="input-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    </div>
+                    <input type="text" name="lastName" defaultValue={dbUser.lastName || ""} placeholder="Apellido" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="input-group-full">
+                <label>NOMBRE DE LA EMPRESA</label>
+                <div className="input-with-icon">
+                  <div className="input-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+                  </div>
+                  <input type="text" name="companyName" defaultValue={dbUser.companyName || ""} placeholder="Nombre de la Empresa" />
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {/* Right Side: Subscription */}
+        <div className="settings-sidebar-col">
+          
+          <div className="card-premium">
+            <div className="card-premium-header">
+              <div className="card-icon-badge badge-red">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+              </div>
+              <h3>Suscripción</h3>
+            </div>
+            
+            <div className="card-premium-body">
+              <div className="subscription-status-row">
+                <span className="status-label">PLAN ACTUAL</span>
+                <span className={`status-badge ${dbUser.plan === 'free' ? 'free' : 'pro'}`}>
+                  {dbUser.plan || "Free"}
+                </span>
               </div>
 
               {dbUser.stripeCustomerId && (
-                <div>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>ID de Cliente (Stripe)</p>
-                  <p style={{ fontSize: '0.9rem', fontFamily: 'monospace', background: '#f8fafc', padding: '0.5rem', borderRadius: '4px', wordBreak: 'break-all' }}>{dbUser.stripeCustomerId}</p>
+                <div className="stripe-id-box">
+                  <span className="status-label">ID DE CLIENTE (STRIPE)</span>
+                  <code>{dbUser.stripeCustomerId}</code>
                 </div>
               )}
 
               {dbUser.stripeSubscriptionId && (
-                <div>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>ID de Suscripción</p>
-                  <p style={{ fontSize: '0.9rem', fontFamily: 'monospace', background: '#f8fafc', padding: '0.5rem', borderRadius: '4px', wordBreak: 'break-all' }}>{dbUser.stripeSubscriptionId}</p>
+                <div className="stripe-id-box">
+                  <span className="status-label">ID DE SUSCRIPCIÓN</span>
+                  <code>{dbUser.stripeSubscriptionId}</code>
                 </div>
               )}
 
-              <div style={{ marginTop: '1rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  Para gestionar tus métodos de pago y facturas, visita el portal de facturación en Kônsul Bills.
-                </p>
-              </div>
+              <p className="subscription-notice">
+                Para gestionar tus métodos de pago, facturas o cancelar tu plan actual, visita el portal de facturación en Kônsul Bills.
+              </p>
             </div>
           </div>
-        </section>
-
+          
+        </div>
+        
       </div>
+
     </main>
   );
 }
