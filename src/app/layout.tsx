@@ -24,7 +24,7 @@ export default async function RootLayout({
           <>
             <aside className="sidebar">
               <div className="sidebar-logo">
-                <img src="https://konsul.digital/images/Konsul-logo-general.png" alt="Kônsul" style={{ height: '32px' }} />
+                <img src="https://konsul.digital/images/Konsul-logo-general.png" alt="Kônsul" style={{ height: '48px' }} />
               </div>
               <nav className="sidebar-nav">
                 <a href="#" className="nav-item active">
