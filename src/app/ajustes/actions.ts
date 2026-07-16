@@ -34,9 +34,8 @@ export async function updateUserProfile(formData: FormData) {
     });
 
     revalidatePath('/ajustes');
-    return { success: true };
   } catch (error) {
     console.error("Error updating user:", error);
-    return { success: false, error: "No se pudo actualizar el perfil" };
+    throw new Error("No se pudo actualizar el perfil");
   }
 }
