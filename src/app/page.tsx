@@ -176,6 +176,31 @@ export default async function DashboardHub() {
             </div>
           </div>
         </a>
+
+        {/* Mailing Card */}
+        <a href="https://mailing.konsul.digital/api/auth/login?prompt=none" className="card card-mailing">
+          <div className="card-header-suite">
+            <div className="card-suite-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            </div>
+            <span className="card-badge-status">
+              Activo
+            </span>
+          </div>
+          <div className="card-body">
+            <h3>Kônsul Mailing</h3>
+            <p>Automatización de campañas, envío masivo de correos y análisis de métricas de apertura.</p>
+          </div>
+          <div className="card-footer-suite">
+            <div className="quick-links">
+              <span className="quick-link-btn">Correos</span>
+              <span className="quick-link-btn">Audiencias</span>
+            </div>
+            <div className="arrow-suite-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            </div>
+          </div>
+        </a>
       </div>
     </main>
   );

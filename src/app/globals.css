@@ -344,6 +344,13 @@ body {
   background: linear-gradient(135deg, #ffffff 0%, #faf5ff 100%);
 }
 
+.card-mailing {
+  border-top: 6px solid #ec4899;
+}
+.card-mailing:hover {
+  background: linear-gradient(135deg, #ffffff 0%, #fdf2f8 100%);
+}
+
 .card-header-suite {
   display: flex;
   justify-content: space-between;
@@ -365,6 +372,7 @@ body {
 .card-process .card-suite-icon { background: #dbeafe; color: #1e40af; }
 .card-reactivaleads .card-suite-icon { background: #ffedd5; color: #9a3412; }
 .card-kredit .card-suite-icon { background: #ede9fe; color: #5b21b6; }
+.card-mailing .card-suite-icon { background: #fce7f3; color: #be185d; }
 
 .card-badge-status {
   padding: 0.35rem 0.75rem;
@@ -380,6 +388,7 @@ body {
 .card-process .card-badge-status { background: #dbeafe; color: #1e40af; }
 .card-reactivaleads .card-badge-status { background: #ffedd5; color: #9a3412; }
 .card-kredit .card-badge-status { background: #ede9fe; color: #5b21b6; }
+.card-mailing .card-badge-status { background: #fce7f3; color: #be185d; }
 
 .card-body h3 {
   font-size: 1.4rem;
