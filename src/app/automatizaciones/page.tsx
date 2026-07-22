@@ -106,6 +106,31 @@ export default async function AutomatizacionesPage() {
       {/* Visual Connection Hub Node Map */}
       <div className="card-premium visual-hub-card">
         <div className="visual-hub-container">
+          {/* SVG Connection Lines Overlay */}
+          <svg className="connections-svg" viewBox="0 0 500 400" style={{ position: 'absolute', width: '100%', height: '100%', top: 0, left: 0, pointerEvents: 'none', zIndex: 1 }}>
+            {apps.map((app, index) => {
+              const intData = activeIntegrationsMap.get(app.code);
+              const isActive = intData?.isActive || false;
+              
+              // Calculate radial coordinates identical to satellite translation
+              const angle = (index * 2 * Math.PI) / apps.length;
+              const radius = 160; // slightly shorter for node center matching
+              const x = Math.cos(angle) * radius;
+              const y = Math.sin(angle) * radius;
+              
+              return (
+                <line
+                  key={app.code}
+                  x1={250} // Centered in the 500px wide container
+                  y1={200} // Centered in the 400px high container
+                  x2={250 + x}
+                  y2={200 + y}
+                  className={`connection-line-path ${isActive ? 'active' : ''}`}
+                />
+              );
+            })}
+          </svg>
+
           <div className="central-node">
             <div className="node-glow"></div>
             <img src="https://konsul.digital/images/logo-app-konsul.png" alt="Kônsul Suite" />
@@ -119,7 +144,7 @@ export default async function AutomatizacionesPage() {
             
             // Calculate radial coordinates
             const angle = (index * 2 * Math.PI) / apps.length;
-            const radius = 170; // px
+            const radius = 160; // px
             const x = Math.cos(angle) * radius;
             const y = Math.sin(angle) * radius;
 
@@ -131,18 +156,6 @@ export default async function AutomatizacionesPage() {
                   transform: `translate(${x}px, ${y}px)`
                 }}
               >
-                {/* Visual Connection Line */}
-                <div 
-                  className="connection-line"
-                  style={{
-                    width: `${radius}px`,
-                    transform: `rotate(${angle + Math.PI}deg)`,
-                    transformOrigin: 'right center'
-                  }}
-                >
-                  <div className="pulse-signal"></div>
-                </div>
-
                 <div className="satellite-node" style={{ borderColor: app.color, background: app.bgLight }}>
                   <div className="node-icon" style={{ color: app.color }}>{app.icon}</div>
                 </div>

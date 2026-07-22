@@ -16,8 +16,6 @@ datasource db {
 
 
 
-
-
 model User {
   id                   String          @id // Kinde User ID
   legacyId             String?         @unique // Original DB ID for reference
@@ -36,7 +34,6 @@ model User {
   
   apps                 UserAppAccess[]
   integrations         Integration[]
-  apiKeys              ApiKey[]
 }
 
 model App {
@@ -75,17 +72,4 @@ model Integration {
 
   @@unique([userId, appCode])
 }
-
-model ApiKey {
-  id          String   @id @default(cuid())
-  userId      String
-  name        String
-  keyValue    String   @unique
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  lastUsedAt  DateTime?
-
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
 

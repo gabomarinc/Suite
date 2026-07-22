@@ -1143,6 +1143,10 @@ body {
 
 .satellite-node-wrapper {
   position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-top: -40px;
+  margin-left: -40px;
   width: 80px;
   height: 80px;
   display: flex;
@@ -1150,6 +1154,7 @@ body {
   align-items: center;
   z-index: 5;
 }
+
 
 .satellite-node {
   width: 60px;
@@ -1215,44 +1220,26 @@ body {
   color: #d97706;
 }
 
-.connection-line {
-  position: absolute;
-  height: 2px;
-  background: repeating-linear-gradient(90deg, #cbd5e1, #cbd5e1 4px, transparent 4px, transparent 8px);
-  top: 30px;
-  right: 30px;
-  z-index: -1;
+.connection-line-path {
+  stroke: #cbd5e1;
+  stroke-width: 2px;
+  stroke-dasharray: 5 5;
   transition: all 0.3s ease;
 }
 
-.satellite-node-wrapper.active .connection-line {
-  background: #34d399;
-  height: 2.5px;
+.connection-line-path.active {
+  stroke: #34d399;
+  stroke-width: 2.5px;
+  stroke-dasharray: 8 6;
+  animation: connection-flow 1.5s linear infinite;
 }
 
-.pulse-signal {
-  display: none;
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: white;
-  box-shadow: 0 0 8px #34d399;
-  top: -2px;
-  left: 0;
-  animation: move-signal 2s linear infinite;
+@keyframes connection-flow {
+  to {
+    stroke-dashoffset: -28;
+  }
 }
 
-.satellite-node-wrapper.active .pulse-signal {
-  display: block;
-}
-
-@keyframes move-signal {
-  0% { left: 0%; opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { left: 100%; opacity: 0; }
-}
 
 /* Integrations grid cards */
 .integrations-grid {

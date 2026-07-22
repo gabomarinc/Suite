@@ -2,8 +2,6 @@ import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { updateUserProfile } from "./actions";
-import ApiKeyManager from "@/components/ApiKeyManager";
-
 
 export default async function AjustesPage() {
   const { isAuthenticated, getUser } = getKindeServerSession();
@@ -36,12 +34,6 @@ export default async function AjustesPage() {
       }
     });
   }
-
-  const apiKeys = await prisma.apiKey.findMany({
-    where: { userId: kindeUser.id },
-    orderBy: { createdAt: 'desc' }
-  });
-
 
   return (
     <main className="dashboard settings-page-wrapper">
@@ -124,9 +116,7 @@ export default async function AjustesPage() {
               </div>
             </div>
           </form>
-          <ApiKeyManager initialKeys={apiKeys} />
         </div>
-
 
         {/* Right Side: Subscription */}
         <div className="settings-sidebar-col">
