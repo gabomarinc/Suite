@@ -39,3 +39,44 @@ export async function updateUserProfile(formData: FormData) {
     throw new Error("No se pudo actualizar el perfil");
   }
 }
+
+export async function generateSuiteApiKey(name: string) {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  if (!isAuth) throw new Error("No autenticado");
+
+  const user = await getUser();
+  if (!user || !user.id) throw new Error("Usuario no encontrado");
+
+  const crypto = require('crypto');
+  const keyValue = `ks_live_${crypto.randomBytes(24).toString('hex')}`;
+
+  await prisma.apiKey.create({
+    data: {
+      userId: user.id,
+      name: name || "Nueva Llave API",
+      keyValue
+    }
+  });
+
+  revalidatePath('/ajustes');
+}
+
+export async function revokeSuiteApiKey(keyId: string) {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  if (!isAuth) throw new Error("No autenticado");
+
+  const user = await getUser();
+  if (!user || !user.id) throw new Error("Usuario no encontrado");
+
+  await prisma.apiKey.delete({
+    where: {
+      id: keyId,
+      userId: user.id
+    }
+  });
+
+  revalidatePath('/ajustes');
+}
+
