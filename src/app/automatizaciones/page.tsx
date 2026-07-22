@@ -1,7 +1,8 @@
 import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { toggleIntegration, saveServiceKey } from "./actions";
+import IntegrationCard from "@/components/IntegrationCard";
+
 
 export default async function AutomatizacionesPage() {
   const { isAuthenticated, getUser } = getKindeServerSession();
@@ -164,59 +165,12 @@ export default async function AutomatizacionesPage() {
           const serviceKey = intData?.serviceKey || '';
 
           return (
-            <div key={app.code} className="card-premium integration-card">
-              <div className="integration-card-header">
-                <div className="integration-app-info">
-                  <div className="app-icon-wrapper" style={{ background: app.bgLight, color: app.color }}>
-                    {app.icon}
-                  </div>
-                  <div>
-                    <h4>{app.name}</h4>
-                    <p className="app-desc">{app.description}</p>
-                  </div>
-                </div>
-
-                {/* Quick Toggle Status */}
-                {serviceKey && (
-                  <form action={async () => {
-                    'use server';
-                    await toggleIntegration(app.code, isActive);
-                  }}>
-                    <button type="submit" className={`switch-toggle ${isActive ? 'active' : ''}`}>
-                      <div className="switch-handle"></div>
-                    </button>
-                  </form>
-                )}
-              </div>
-
-              <div className="integration-card-body">
-                <form action={async (formData: FormData) => {
-                  'use server';
-                  const key = formData.get('serviceKey') as string;
-                  await saveServiceKey(app.code, key);
-                }}>
-                  <div className="input-group-full">
-                    <label>SERVICE KEY ({app.keyPrefix}...)</label>
-                    <div className="input-with-icon">
-                      <div className="input-icon">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                      </div>
-                      <input 
-                        type="password" 
-                        name="serviceKey" 
-                        defaultValue={serviceKey}
-                        placeholder={`Ej: ${app.keyPrefix}xxxxxxxx`} 
-                      />
-                    </div>
-                  </div>
-                  <div className="integration-actions">
-                    <button type="submit" className="btn-save-key">
-                      {serviceKey ? 'Actualizar Clave' : 'Conectar Aplicación'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
+            <IntegrationCard
+              key={app.code}
+              app={app}
+              initialIsActive={isActive}
+              initialServiceKey={serviceKey}
+            />
           );
         })}
       </div>
