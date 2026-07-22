@@ -19,6 +19,14 @@ interface IntegrationCardProps {
   initialServiceKey: string;
 }
 
+interface SavedAutomation {
+  id: string;
+  type: 'trigger' | 'action';
+  name: string;
+  details: string;
+  isActive: boolean;
+}
+
 export default function IntegrationCard({
   app,
   initialIsActive,
@@ -31,6 +39,86 @@ export default function IntegrationCard({
   const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [testLog, setTestLog] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Automation Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'triggers' | 'actions'>('triggers');
+  const [selectedTriggerIdx, setSelectedTriggerIdx] = useState(0);
+  const [selectedActionIdx, setSelectedActionIdx] = useState(0);
+  const [fieldInputs, setFieldInputs] = useState<Record<string, string>>({});
+  
+  // Simulated Saved Automations list
+  const [automations, setAutomations] = useState<SavedAutomation[]>([
+    {
+      id: 'auto-1',
+      type: 'trigger',
+      name: app.code === 'bills' ? 'Factura Cobrada / Pagada' : app.code === 'reactivaleads' ? 'Nuevo Lead Registrado' : 'Evento de Integración',
+      details: 'Sincronizando flujos automáticos con Kônsul Suite',
+      isActive: true
+    }
+  ]);
+
+  // App automation possibilities
+  const appConfigs: Record<string, {
+    triggers: { name: string; description: string }[];
+    actions: { name: string; description: string; fields: string[] }[];
+  }> = {
+    bills: {
+      triggers: [
+        { name: 'Nueva Factura Creada', description: 'Se dispara cuando se genera una nueva factura o recibo.' },
+        { name: 'Factura Cobrada / Pagada', description: 'Se dispara cuando una factura cambia de estado a Pagado.' },
+        { name: 'Cliente Creado', description: 'Se dispara al dar de alta un nuevo cliente en el catálogo.' }
+      ],
+      actions: [
+        { name: 'Crear Factura Borrador', description: 'Genera una nueva factura en borrador para revisión.', fields: ['Cliente (Email)', 'Concepto', 'Monto Total'] },
+        { name: 'Registrar Cobro/Pago', description: 'Marca una factura existente como pagada.', fields: ['ID Factura', 'Método de Pago'] },
+        { name: 'Crear Cliente Nuevo', description: 'Añade un cliente a la base de datos de facturación.', fields: ['Nombre', 'Email', 'RFC / Identificación Fiscal'] }
+      ]
+    },
+    process: {
+      triggers: [
+        { name: 'Nueva Tarea / Tarjeta', description: 'Se dispara cuando se crea una tarjeta en cualquier tablero.' },
+        { name: 'Estado de Tarea Cambiado', description: 'Se dispara cuando una tarjeta se mueve de columna (ej: a Completado).' }
+      ],
+      actions: [
+        { name: 'Crear Tarjeta / Tarea', description: 'Crea una tarjeta en un tablero y columna específica.', fields: ['ID Tablero', 'Nombre de Columna', 'Título Tarea', 'Descripción'] },
+        { name: 'Mover Tarjeta', description: 'Desplaza una tarjeta existente a otra columna.', fields: ['ID Tarjeta', 'Columna Destino'] },
+        { name: 'Asignar Miembro', description: 'Asigna la tarea a un usuario del equipo.', fields: ['ID Tarjeta', 'Email Asignado'] }
+      ]
+    },
+    reactivaleads: {
+      triggers: [
+        { name: 'Nuevo Lead Registrado', description: 'Se dispara al capturar un lead desde algún formulario/embudo.' },
+        { name: 'Lead Calificado', description: 'Se dispara cuando un lead alcanza un score de calificación mínimo.' }
+      ],
+      actions: [
+        { name: 'Crear o Importar Lead', description: 'Inserta un nuevo prospecto en la base de datos central.', fields: ['Nombre Lead', 'Email', 'Teléfono', 'Origen/Campaña'] },
+        { name: 'Asignar Agente', description: 'Asigna el prospecto a un asesor de ventas.', fields: ['ID Lead', 'Email Agente'] }
+      ]
+    },
+    kredit: {
+      triggers: [
+        { name: 'Nueva Solicitud de Crédito', description: 'Se dispara cuando un cliente solicita financiación.' },
+        { name: 'Evaluación de Riesgo Completada', description: 'Se dispara al terminar el análisis de score crediticio.' }
+      ],
+      actions: [
+        { name: 'Iniciar Análisis de Riesgo', description: 'Dispara el motor de evaluación para un cliente.', fields: ['ID Cliente', 'Monto Solicitado', 'Plazo (Meses)'] },
+        { name: 'Aprobar Pre-Crédito', description: 'Pre-aprueba la solicitud de crédito del cliente.', fields: ['ID Solicitud', 'Límite Sugerido'] }
+      ]
+    },
+    mailing: {
+      triggers: [
+        { name: 'Nuevo Suscriptor', description: 'Se dispara cuando alguien se une a una lista de correos.' },
+        { name: 'Enlace de Correo Abierto / Clicked', description: 'Se dispara cuando un destinatario interactúa con un enlace.' }
+      ],
+      actions: [
+        { name: 'Enviar Correo Transaccional', description: 'Envía un email directo usando una plantilla.', fields: ['Email Destinatario', 'Plantilla ID', 'Variables JSON (Estructura)'] },
+        { name: 'Añadir a Lista de Envío', description: 'Suscribe a un usuario a una campaña o newsletter.', fields: ['Email', 'Nombre', 'ID Lista'] }
+      ]
+    }
+  };
+
+  const currentConfig = appConfigs[app.code] || { triggers: [], actions: [] };
 
   const handleToggle = async () => {
     try {
@@ -67,7 +155,6 @@ export default function IntegrationCard({
     setTestStatus('loading');
     setTestLog(['Iniciando prueba de interoperabilidad...', 'Verificando formato de Service Key...']);
     
-    // Simulate steps in UI logs
     setTimeout(async () => {
       try {
         const result = await testIntegration(app.code, keyToTest);
@@ -75,7 +162,7 @@ export default function IntegrationCard({
         if (result.success) {
           setTestLog(prev => [
             ...prev,
-            `Prefijo '${app.keyPrefix}' válido.`,
+            `Prefijo válido.`,
             `Conectando a endpoint del servicio (${app.name})...`,
             ...result.logs,
             `Prueba completada con éxito. Lectura/Escritura al 100%.`
@@ -94,6 +181,51 @@ export default function IntegrationCard({
       }
     }, 800);
   };
+
+  const handleAddAutomation = (e: React.FormEvent) => {
+    e.preventDefault();
+    let newAuto: SavedAutomation;
+
+    if (activeTab === 'triggers') {
+      const trigger = currentConfig.triggers[selectedTriggerIdx];
+      newAuto = {
+        id: `auto-${Date.now()}`,
+        type: 'trigger',
+        name: trigger.name,
+        details: 'Disparador registrado: Webhook activo listo para lectura.',
+        isActive: true
+      };
+    } else {
+      const action = currentConfig.actions[selectedActionIdx];
+      const filledDetails = Object.entries(fieldInputs)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(', ');
+      
+      newAuto = {
+        id: `auto-${Date.now()}`,
+        type: 'action',
+        name: action.name,
+        details: filledDetails ? `Parámetros: ${filledDetails}` : 'Acción registrada para ejecución en lote.',
+        isActive: true
+      };
+    }
+
+    setAutomations([...automations, newAuto]);
+    setFieldInputs({});
+    alert('¡Automatización creada con éxito!');
+  };
+
+  const handleDeleteAutomation = (id: string) => {
+    setAutomations(automations.filter(item => item.id !== id));
+  };
+
+  const toggleAutomationActive = (id: string) => {
+    setAutomations(automations.map(item => 
+      item.id === id ? { ...item, isActive: !item.isActive } : item
+    ));
+  };
+
+  const isConnectionVerified = serviceKey && (testStatus === 'success' || isActive);
 
   return (
     <div className="card-premium integration-card">
@@ -132,7 +264,7 @@ export default function IntegrationCard({
                 type={showPassword ? "text" : "password"} 
                 value={inputKey}
                 onChange={(e) => setInputKey(e.target.value)}
-                placeholder={`Ej: ${app.keyPrefix}xxxxxxxx`} 
+                placeholder={`Ej: ${app.keyPrefix.split(' ')[0]}xxxxxxxx`} 
                 autoComplete="new-password"
                 style={{ paddingRight: '2.5rem' }}
               />
@@ -181,12 +313,35 @@ export default function IntegrationCard({
                 Probar Conexión
               </button>
             )}
+            
+            {/* Automate Button: Shown only when connection key is active & verified */}
+            {isConnectionVerified && (
+              <button 
+                type="button" 
+                onClick={() => setIsModalOpen(true)}
+                className="btn-automate"
+                style={{
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.6rem 1.2rem',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 4px 10px rgba(37, 99, 235, 0.2)'
+                }}
+              >
+                ⚙️ Automatizar
+              </button>
+            )}
+
             <button type="submit" className="btn-save-key" disabled={isSaving}>
               {isSaving ? 'Guardando...' : serviceKey ? 'Actualizar Clave' : 'Conectar Aplicación'}
             </button>
           </div>
         </form>
-
 
         {/* Console/Test Logs Display */}
         {testStatus !== 'idle' && (
@@ -216,6 +371,333 @@ export default function IntegrationCard({
           </div>
         )}
       </div>
+
+      {/* AUTOMATION BUILDER MODAL */}
+      {isModalOpen && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }}>
+          <div className="modal-content card-premium" style={{
+            width: '100%',
+            maxWidth: '650px',
+            background: '#ffffff',
+            borderRadius: '16px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: '85vh',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div className="modal-header" style={{
+              padding: '1.5rem',
+              borderBottom: '1px solid #f1f5f9',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: `linear-gradient(135deg, ${app.bgLight} 0%, #ffffff 100%)`
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ color: app.color, background: 'white', padding: '0.5rem', borderRadius: '8px', display: 'flex', border: '1px solid #f1f5f9' }}>
+                  {app.icon}
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a', fontWeight: 700 }}>
+                    Automatizar con {app.name}
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
+                    Configura disparadores de lectura y acciones de escritura automáticos
+                  </p>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setIsModalOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  lineHeight: '1'
+                }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="modal-body" style={{
+              padding: '1.5rem',
+              overflowY: 'auto',
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.5rem'
+            }}>
+              {/* Tab Selector */}
+              <div style={{
+                display: 'flex',
+                background: '#f1f5f9',
+                padding: '0.25rem',
+                borderRadius: '8px',
+                gap: '0.25rem'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('triggers')}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    background: activeTab === 'triggers' ? '#ffffff' : 'transparent',
+                    color: activeTab === 'triggers' ? app.color : '#64748b',
+                    boxShadow: activeTab === 'triggers' ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  ⚡ Lectura / Triggers
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('actions')}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    background: activeTab === 'actions' ? '#ffffff' : 'transparent',
+                    color: activeTab === 'actions' ? app.color : '#64748b',
+                    boxShadow: activeTab === 'actions' ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  ✍️ Escritura / Acciones
+                </button>
+              </div>
+
+              {/* Form Configurator */}
+              <form onSubmit={handleAddAutomation} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="input-group-full">
+                  <label style={{ color: '#0f172a', fontWeight: 600 }}>
+                    {activeTab === 'triggers' ? 'Seleccionar Disparador (Cuando pase esto):' : 'Seleccionar Acción (Hacer esto automáticamente):'}
+                  </label>
+                  <select
+                    value={activeTab === 'triggers' ? selectedTriggerIdx : selectedActionIdx}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (activeTab === 'triggers') {
+                        setSelectedTriggerIdx(val);
+                      } else {
+                        setSelectedActionIdx(val);
+                      }
+                      setFieldInputs({});
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.6rem',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      marginTop: '0.4rem',
+                      outline: 'none',
+                      fontSize: '0.85rem'
+                    }}
+                  >
+                    {activeTab === 'triggers' 
+                      ? currentConfig.triggers.map((item, idx) => (
+                          <option key={idx} value={idx}>{item.name}</option>
+                        ))
+                      : currentConfig.actions.map((item, idx) => (
+                          <option key={idx} value={idx}>{item.name}</option>
+                        ))
+                    }
+                  </select>
+                  <p style={{ margin: '0.4rem 0 0', fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>
+                    {activeTab === 'triggers'
+                      ? currentConfig.triggers[selectedTriggerIdx]?.description
+                      : currentConfig.actions[selectedActionIdx]?.description
+                    }
+                  </p>
+                </div>
+
+                {/* Dynamic Parameter Fields */}
+                {activeTab === 'actions' && currentConfig.actions[selectedActionIdx]?.fields.length > 0 && (
+                  <div style={{
+                    background: '#f8fafc',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem'
+                  }}>
+                    <strong style={{ fontSize: '0.8rem', color: '#334155' }}>Campos a mapear en {app.name}:</strong>
+                    {currentConfig.actions[selectedActionIdx].fields.map((field) => (
+                      <div key={field} className="input-group-full" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569' }}>{field}</span>
+                        <input
+                          type="text"
+                          required
+                          value={fieldInputs[field] || ''}
+                          onChange={(e) => setFieldInputs({ ...fieldInputs, [field]: e.target.value })}
+                          placeholder={`Ingresa o vincula un campo para ${field}`}
+                          style={{
+                            padding: '0.5rem',
+                            fontSize: '0.8rem',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '6px'
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  style={{
+                    background: app.color,
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.65rem 1rem',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    alignSelf: 'flex-start'
+                  }}
+                >
+                  {activeTab === 'triggers' ? '+ Activar Webhook Disparador' : '+ Crear Nueva Acción'}
+                </button>
+              </form>
+
+              {/* Active Rules List */}
+              <div style={{
+                marginTop: '0.5rem',
+                borderTop: '1px solid #e2e8f0',
+                paddingTop: '1rem'
+              }}>
+                <h5 style={{ margin: '0 0 0.75rem', fontSize: '0.9rem', color: '#0f172a', fontWeight: 700 }}>
+                  Flujos de Automatización Activos ({automations.length})
+                </h5>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {automations.length === 0 ? (
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', padding: '1rem', background: '#f8fafc', borderRadius: '8px' }}>
+                      No tienes reglas activas todavía.
+                    </div>
+                  ) : (
+                    automations.map((item) => (
+                      <div key={item.id} style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '0.75rem',
+                        background: '#f8fafc',
+                        borderRadius: '8px',
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span style={{
+                              fontSize: '0.65rem',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              padding: '0.15rem 0.4rem',
+                              borderRadius: '4px',
+                              background: item.type === 'trigger' ? '#eff6ff' : '#ecfdf5',
+                              color: item.type === 'trigger' ? '#1e40af' : '#065f46'
+                            }}>
+                              {item.type === 'trigger' ? 'LECTURA' : 'ESCRITURA'}
+                            </span>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>
+                              {item.name}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                            {item.details}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => toggleAutomationActive(item.id)}
+                            className={`switch-toggle ${item.isActive ? 'active' : ''}`}
+                            style={{ transform: 'scale(0.8)' }}
+                          >
+                            <div className="switch-handle"></div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAutomation(item.id)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#ef4444',
+                              cursor: 'pointer',
+                              fontSize: '1rem',
+                              padding: '0.2rem'
+                            }}
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="modal-footer" style={{
+              padding: '1.25rem 1.5rem',
+              borderTop: '1px solid #f1f5f9',
+              background: '#f8fafc',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '0.5rem'
+            }}>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="btn-test-connection"
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  color: '#475569',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cerrar Panel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
