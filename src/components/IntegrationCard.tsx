@@ -65,14 +65,16 @@ export default function IntegrationCard({
   }> = {
     bills: {
       triggers: [
-        { name: 'Nueva Factura Creada', description: 'Se dispara cuando se genera una nueva factura o recibo.' },
-        { name: 'Factura Cobrada / Pagada', description: 'Se dispara cuando una factura cambia de estado a Pagado.' },
-        { name: 'Cliente Creado', description: 'Se dispara al dar de alta un nuevo cliente en el catálogo.' }
+        { name: 'Documento Creado (Factura/Cotización)', description: 'Consulta periódica a GET /api/v1/invoices para nuevos documentos.' },
+        { name: 'Estado de Factura Actualizado', description: 'Se dispara cuando una factura cambia a Pagada, Aceptada, etc.' },
+        { name: 'Nuevo Cliente o Prospecto', description: 'Consulta periódica a GET /api/v1/clients para nuevos registros.' },
+        { name: 'Métricas Financieras Cambiadas', description: 'Monitoreo de métricas consolidadas en GET /api/v1/summary.' }
       ],
       actions: [
-        { name: 'Crear Factura Borrador', description: 'Genera una nueva factura en borrador para revisión.', fields: ['Cliente (Email)', 'Concepto', 'Monto Total'] },
-        { name: 'Registrar Cobro/Pago', description: 'Marca una factura existente como pagada.', fields: ['ID Factura', 'Método de Pago'] },
-        { name: 'Crear Cliente Nuevo', description: 'Añade un cliente a la base de datos de facturación.', fields: ['Nombre', 'Email', 'RFC / Identificación Fiscal'] }
+        { name: 'Crear Factura o Cotización', description: 'POST /api/v1/invoices - Genera documento (ideal para Agentes IA).', fields: ['clientName', 'clientEmail', 'total (Monto)', 'concept', 'type (Invoice/Quote)', 'status', 'currency'] },
+        { name: 'Actualizar Estado de Factura', description: 'PUT /api/v1/invoices - Marca una factura como Pagada, Aceptada o Incobrable.', fields: ['id (ID de Factura)', 'status'] },
+        { name: 'Crear o Actualizar Cliente', description: 'POST /api/v1/clients - Registra automáticamente un cliente o prospecto.', fields: ['name', 'email', 'phone', 'status', 'tags', 'notes'] },
+        { name: 'Agregar Ítem al Catálogo', description: 'POST /api/v1/catalog - Agrega o actualiza un servicio.', fields: ['Nombre del Producto/Servicio', 'Precio', 'Impuesto (%)'] }
       ]
     },
     process: {
