@@ -265,7 +265,10 @@ export default function IntegrationCard({
               <input 
                 type={showPassword ? "text" : "password"} 
                 value={inputKey}
-                onChange={(e) => setInputKey(e.target.value)}
+                onChange={(e) => {
+                  setInputKey(e.target.value);
+                  setTestStatus('idle');
+                }}
                 placeholder={`Ej: ${app.keyPrefix.split(' ')[0]}xxxxxxxx`} 
                 autoComplete="new-password"
                 style={{ paddingRight: '2.5rem' }}
@@ -295,7 +298,7 @@ export default function IntegrationCard({
             </div>
           </div>
           <div className="integration-actions" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-            {inputKey && (
+            {inputKey && testStatus !== 'success' && (
               <button 
                 type="button" 
                 onClick={handleTestConnection}
@@ -323,19 +326,28 @@ export default function IntegrationCard({
                 onClick={() => setIsModalOpen(true)}
                 className="btn-automate"
                 style={{
-                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                   color: 'white',
                   border: 'none',
-                  padding: '0.6rem 1.2rem',
+                  padding: '0.6rem 1.25rem',
                   borderRadius: '8px',
                   fontSize: '0.85rem',
-                  fontWeight: 600,
+                  fontWeight: 700,
+                  letterSpacing: '0.02em',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
-                  boxShadow: '0 4px 10px rgba(37, 99, 235, 0.2)'
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(37, 99, 235, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
                 }}
               >
-                ⚙️ Automatizar
+                Automatizar
               </button>
             )}
 
