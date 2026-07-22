@@ -73,19 +73,21 @@ export async function saveServiceKey(appCode: string, serviceKey: string) {
 }
 
 export async function testIntegration(appCode: string, serviceKey: string) {
-  const prefixes: Record<string, string> = {
-    bills: 'kb_svc_',
-    process: 'kp_svc_',
-    reactivaleads: 'lh_svc_',
-    kredit: 'kk_svc_',
-    mailing: 'km_svc_'
+  const prefixes: Record<string, string[]> = {
+    bills: ['kb_live_', 'kb_svc_', 'kb_test_'],
+    process: ['kp_live_', 'kp_svc_', 'kp_test_'],
+    reactivaleads: ['lh_live_', 'lh_svc_', 'lh_test_'],
+    kredit: ['kk_live_', 'kk_svc_', 'kk_test_'],
+    mailing: ['km_live_', 'km_svc_', 'km_test_']
   };
 
-  const expectedPrefix = prefixes[appCode];
-  if (!expectedPrefix || !serviceKey.startsWith(expectedPrefix)) {
+  const allowedPrefixes = prefixes[appCode];
+  const isValid = allowedPrefixes?.some(prefix => serviceKey.startsWith(prefix));
+
+  if (!isValid) {
     return {
       success: false,
-      message: `Prefijo inválido. Debe comenzar con '${expectedPrefix}'`,
+      message: `Prefijo inválido. Debe comenzar con uno de los siguientes: ${allowedPrefixes?.map(p => `'${p}'`).join(', ')}`,
       logs: []
     };
   }
