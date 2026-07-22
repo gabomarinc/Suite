@@ -34,6 +34,7 @@ model User {
   
   apps                 UserAppAccess[]
   integrations         Integration[]
+  automationRules      AutomationRule[]
 }
 
 model App {
@@ -71,5 +72,21 @@ model Integration {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, appCode])
+}
+
+model AutomationRule {
+  id           String   @id @default(cuid())
+  userId       String
+  sourceApp    String
+  triggerIdx   Int
+  targetApp    String
+  actionIdx    Int
+  mappings     Json
+  mappingTypes Json
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 

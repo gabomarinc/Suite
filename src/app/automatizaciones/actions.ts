@@ -109,3 +109,88 @@ export async function testIntegration(appCode: string, serviceKey: string) {
   };
 }
 
+export async function getAutomationRules() {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  if (!isAuth) return [];
+
+  const user = await getUser();
+  if (!user || !user.id) return [];
+
+  return await prisma.automationRule.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: 'desc' }
+  });
+}
+
+export async function createAutomationRule(data: {
+  sourceApp: string;
+  triggerIdx: number;
+  targetApp: string;
+  actionIdx: number;
+  mappings: any;
+  mappingTypes: any;
+}) {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  if (!isAuth) throw new Error("No autenticado");
+
+  const user = await getUser();
+  if (!user || !user.id) throw new Error("Usuario no encontrado");
+
+  const rule = await prisma.automationRule.create({
+    data: {
+      userId: user.id,
+      sourceApp: data.sourceApp,
+      triggerIdx: data.triggerIdx,
+      targetApp: data.targetApp,
+      actionIdx: data.actionIdx,
+      mappings: data.mappings,
+      mappingTypes: data.mappingTypes,
+      isActive: true
+    }
+  });
+
+  revalidatePath('/automatizaciones');
+  return rule;
+}
+
+export async function deleteAutomationRule(id: string) {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  if (!isAuth) throw new Error("No autenticado");
+
+  const user = await getUser();
+  if (!user || !user.id) throw new Error("Usuario no encontrado");
+
+  await prisma.automationRule.delete({
+    where: {
+      id,
+      userId: user.id
+    }
+  });
+
+  revalidatePath('/automatizaciones');
+}
+
+export async function toggleAutomationRule(id: string, currentStatus: boolean) {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  if (!isAuth) throw new Error("No autenticado");
+
+  const user = await getUser();
+  if (!user || !user.id) throw new Error("Usuario no encontrado");
+
+  await prisma.automationRule.update({
+    where: {
+      id,
+      userId: user.id
+    },
+    data: {
+      isActive: !currentStatus
+    }
+  });
+
+  revalidatePath('/automatizaciones');
+}
+

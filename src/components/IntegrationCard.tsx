@@ -1,7 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { testIntegration, toggleIntegration, saveServiceKey } from '../app/automatizaciones/actions';
+import { 
+  testIntegration, 
+  toggleIntegration, 
+  saveServiceKey,
+  createAutomationRule,
+  deleteAutomationRule,
+  toggleAutomationRule,
+  getAutomationRules
+} from '../app/automatizaciones/actions';
 
 interface AppItem {
   code: string;
@@ -17,6 +25,7 @@ interface IntegrationCardProps {
   app: AppItem;
   initialIsActive: boolean;
   initialServiceKey: string;
+  initialRules: any[];
 }
 
 interface AutomationRule {
@@ -123,6 +132,7 @@ export default function IntegrationCard({
   app,
   initialIsActive,
   initialServiceKey,
+  initialRules,
 }: IntegrationCardProps) {
   const [isActive, setIsActive] = useState(initialIsActive);
   const [serviceKey, setServiceKey] = useState(initialServiceKey);
@@ -142,85 +152,26 @@ export default function IntegrationCard({
   const [mappingValues, setMappingValues] = useState<Record<string, string>>({});
   const [mappingTypes, setMappingTypes] = useState<Record<string, 'field' | 'static'>>({});
   
-  // Lista de reglas de automatización globales (persisten en localStorage)
-  const [rules, setRules] = useState<AutomationRule[]>([]);
+  // Lista de reglas de automatización globales (vienen de la BD)
+  const [rules, setRules] = useState<AutomationRule[]>(initialRules);
 
-  // Load and sync automations in localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('konsul_connect_rules');
-    if (saved) {
+    setRules(initialRules);
+  }, [initialRules]);
+
+  // Listener to keep cards in sync using Server Actions
+  useEffect(() => {
+    const handleRulesUpdate = async () => {
       try {
-        setRules(JSON.parse(saved));
+        const freshRules = await getAutomationRules();
+        setRules(freshRules as unknown as AutomationRule[]);
       } catch (e) {
         console.error(e);
-      }
-    } else {
-      const defaultRules: AutomationRule[] = [
-        {
-          id: 'rule-default-1',
-          isActive: true,
-          sourceApp: 'reactivaleads',
-          triggerIdx: 0,
-          targetApp: 'process',
-          actionIdx: 0,
-          mappings: {
-            boardId: 'Tablero Comercial',
-            columnName: 'Leads Entrantes',
-            taskTitle: 'leadName',
-            taskDesc: 'leadPhone'
-          },
-          mappingTypes: {
-            boardId: 'static',
-            columnName: 'static',
-            taskTitle: 'field',
-            taskDesc: 'field'
-          }
-        },
-        {
-          id: 'rule-default-2',
-          isActive: true,
-          sourceApp: 'bills',
-          triggerIdx: 1,
-          targetApp: 'mailing',
-          actionIdx: 0,
-          mappings: {
-            recipientEmail: 'clientEmail',
-            subject: '¡Pago Confirmado!',
-            body: 'Tu factura ha sido cobrada exitosamente.'
-          },
-          mappingTypes: {
-            recipientEmail: 'field',
-            subject: 'static',
-            body: 'static'
-          }
-        }
-      ];
-      localStorage.setItem('konsul_connect_rules', JSON.stringify(defaultRules));
-      setRules(defaultRules);
-    }
-  }, []);
-
-  // Listener to keep cards in sync
-  useEffect(() => {
-    const handleRulesUpdate = () => {
-      const saved = localStorage.getItem('konsul_connect_rules');
-      if (saved) {
-        try {
-          setRules(JSON.parse(saved));
-        } catch (e) {
-          console.error(e);
-        }
       }
     };
     window.addEventListener('konsul_rules_updated', handleRulesUpdate);
     return () => window.removeEventListener('konsul_rules_updated', handleRulesUpdate);
   }, []);
-
-  const saveRules = (updatedRules: AutomationRule[]) => {
-    localStorage.setItem('konsul_connect_rules', JSON.stringify(updatedRules));
-    setRules(updatedRules);
-    window.dispatchEvent(new Event('konsul_rules_updated'));
-  };
 
   const handleToggle = async () => {
     try {
@@ -284,7 +235,7 @@ export default function IntegrationCard({
   const currentAppConfig = ALL_APPS[app.code] || { name: app.name, code: app.code, triggers: [], actions: [] };
   const targetAppConfig = ALL_APPS[targetApp] || { name: '', code: '', triggers: [], actions: [] };
 
-  const handleAddRule = (e: React.FormEvent) => {
+  const handleAddRule = async (e: React.FormEvent) => {
     e.preventDefault();
     const actionFields = targetAppConfig.actions[selectedActionIdx]?.fields || [];
     
@@ -297,34 +248,56 @@ export default function IntegrationCard({
       finalTypes[field] = mappingTypes[field] || 'static';
     });
 
-    const newRule: AutomationRule = {
-      id: `rule-${Date.now()}`,
-      isActive: true,
-      sourceApp: app.code,
-      triggerIdx: selectedTriggerIdx,
-      targetApp: targetApp,
-      actionIdx: selectedActionIdx,
-      mappings: finalMappings,
-      mappingTypes: finalTypes
-    };
+    try {
+      const savedRule = await createAutomationRule({
+        sourceApp: app.code,
+        triggerIdx: selectedTriggerIdx,
+        targetApp: targetApp,
+        actionIdx: selectedActionIdx,
+        mappings: finalMappings,
+        mappingTypes: finalTypes
+      });
 
-    const newRulesList = [...rules, newRule];
-    saveRules(newRulesList);
-    
-    // Clear mappings state
-    setMappingValues({});
-    setMappingTypes({});
-    alert('¡Regla de automatización conectada y guardada con éxito! ⚡');
+      // Update client state & notify other cards
+      const newRules = [savedRule as unknown as AutomationRule, ...rules];
+      setRules(newRules);
+      window.dispatchEvent(new Event('konsul_rules_updated'));
+
+      // Clear mappings state
+      setMappingValues({});
+      setMappingTypes({});
+      alert('¡Regla de automatización conectada y guardada en BD con éxito! ⚡');
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar la regla en la base de datos.');
+    }
   };
 
-  const handleDeleteRule = (id: string) => {
-    const updated = rules.filter(r => r.id !== id);
-    saveRules(updated);
+  const handleDeleteRule = async (id: string) => {
+    try {
+      await deleteAutomationRule(id);
+      const updated = rules.filter(r => r.id !== id);
+      setRules(updated);
+      window.dispatchEvent(new Event('konsul_rules_updated'));
+    } catch (err) {
+      console.error(err);
+      alert('Error al borrar la regla de la base de datos.');
+    }
   };
 
-  const handleToggleRule = (id: string) => {
-    const updated = rules.map(r => r.id === id ? { ...r, isActive: !r.isActive } : r);
-    saveRules(updated);
+  const handleToggleRule = async (id: string) => {
+    const currentRule = rules.find(r => r.id === id);
+    if (!currentRule) return;
+
+    try {
+      await toggleAutomationRule(id, currentRule.isActive);
+      const updated = rules.map(r => r.id === id ? { ...r, isActive: !r.isActive } : r);
+      setRules(updated);
+      window.dispatchEvent(new Event('konsul_rules_updated'));
+    } catch (err) {
+      console.error(err);
+      alert('Error al cambiar el estado de la regla.');
+    }
   };
 
   // Hide the test connection button once connection is successfully configured & validated

@@ -22,6 +22,12 @@ export default async function AutomatizacionesPage() {
     where: { userId: kindeUser.id }
   });
 
+  // Get user automation rules from DB
+  const dbRules = await prisma.automationRule.findMany({
+    where: { userId: kindeUser.id },
+    orderBy: { createdAt: 'desc' }
+  });
+
   const activeIntegrationsMap = new Map(
     dbIntegrations.map(item => [item.appCode, item])
   );
@@ -183,6 +189,7 @@ export default async function AutomatizacionesPage() {
               app={app}
               initialIsActive={isActive}
               initialServiceKey={serviceKey}
+              initialRules={dbRules}
             />
           );
         })}
