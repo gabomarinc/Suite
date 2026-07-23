@@ -8,7 +8,8 @@ import {
   createAutomationRule,
   deleteAutomationRule,
   toggleAutomationRule,
-  getAutomationRules
+  getAutomationRules,
+  fetchProcessTemplates
 } from '../app/automatizaciones/actions';
 
 interface AppItem {
@@ -148,6 +149,11 @@ export default function IntegrationCard({
   const [targetApp, setTargetApp] = useState<string>('process');
   const [selectedActionIdx, setSelectedActionIdx] = useState(0);
   
+  // Dynamic Process Templates State
+  const [processTemplates, setProcessTemplates] = useState<any[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  
   // Mapeos de campos del formulario
   const [mappingValues, setMappingValues] = useState<Record<string, string>>({});
   const [mappingTypes, setMappingTypes] = useState<Record<string, 'field' | 'static'>>({});
@@ -172,6 +178,28 @@ export default function IntegrationCard({
     window.addEventListener('konsul_rules_updated', handleRulesUpdate);
     return () => window.removeEventListener('konsul_rules_updated', handleRulesUpdate);
   }, []);
+
+  // Fetch Process templates when targetApp is set to 'process'
+  useEffect(() => {
+    if (targetApp === 'process' && serviceKey) {
+      setIsLoadingTemplates(true);
+      fetchProcessTemplates(serviceKey)
+        .then(res => {
+          if (res.success) {
+            setProcessTemplates(res.data);
+            if (res.data.length > 0 && !selectedTemplateId) {
+              setSelectedTemplateId(res.data[0].id);
+            }
+          } else {
+            console.error(res.error);
+          }
+        })
+        .finally(() => {
+          setIsLoadingTemplates(false);
+        });
+    }
+  }, [targetApp, serviceKey, isModalOpen]);
+
 
   const handleToggle = async () => {
     try {
@@ -237,16 +265,23 @@ export default function IntegrationCard({
 
   const handleAddRule = async (e: React.FormEvent) => {
     e.preventDefault();
-    const actionFields = targetAppConfig.actions[selectedActionIdx]?.fields || [];
+    const actionFields = targetApp === 'process'
+      ? (processTemplates.find(t => t.id === selectedTemplateId)?.variables || [])
+      : (targetAppConfig.actions[selectedActionIdx]?.fields || []);
     
     // Build mappings object
     const finalMappings: Record<string, string> = {};
     const finalTypes: Record<string, 'field' | 'static'> = {};
 
-    actionFields.forEach(field => {
+    actionFields.forEach((field: string) => {
       finalMappings[field] = mappingValues[field] || '';
       finalTypes[field] = mappingTypes[field] || 'static';
     });
+
+    if (targetApp === 'process' && selectedTemplateId) {
+      finalMappings['__templateId'] = selectedTemplateId;
+      finalTypes['__templateId'] = 'static';
+    }
 
     try {
       const savedRule = await createAutomationRule({
@@ -643,26 +678,81 @@ export default function IntegrationCard({
                         <option key={code} value={code}>{ALL_APPS[code].name}</option>
                       ))}
                     </select>
-                    <select
-                      value={selectedActionIdx}
-                      onChange={(e) => {
-                        setSelectedActionIdx(parseInt(e.target.value));
-                        setMappingValues({});
-                        setMappingTypes({});
-                      }}
-                      style={{
-                        padding: '0.55rem',
-                        fontSize: '0.85rem',
-                        background: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '6px'
-                      }}
-                    >
-                      {targetAppConfig.actions.map((act, idx) => (
-                        <option key={idx} value={idx}>{act.name}</option>
-                      ))}
-                    </select>
+                    {targetApp === 'process' ? (
+                      <select
+                        disabled
+                        style={{
+                          padding: '0.55rem',
+                          fontSize: '0.85rem',
+                          background: '#f8fafc',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          color: '#475569'
+                        }}
+                      >
+                        <option>Ejecutar Plantilla de Proceso</option>
+                      </select>
+                    ) : (
+                      <select
+                        value={selectedActionIdx}
+                        onChange={(e) => {
+                          setSelectedActionIdx(parseInt(e.target.value));
+                          setMappingValues({});
+                          setMappingTypes({});
+                        }}
+                        style={{
+                          padding: '0.55rem',
+                          fontSize: '0.85rem',
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px'
+                        }}
+                      >
+                        {targetAppConfig.actions.map((act, idx) => (
+                          <option key={idx} value={idx}>{act.name}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
+
+                  {targetApp === 'process' && (
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <select
+                        value={selectedTemplateId}
+                        onChange={(e) => {
+                          setSelectedTemplateId(e.target.value);
+                          setMappingValues({});
+                          setMappingTypes({});
+                        }}
+                        disabled={isLoadingTemplates || processTemplates.length === 0}
+                        style={{
+                          width: '100%',
+                          padding: '0.55rem',
+                          fontSize: '0.85rem',
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          fontWeight: 600,
+                          color: '#0f172a'
+                        }}
+                      >
+                        {isLoadingTemplates ? (
+                          <option value="">⏳ Cargando plantillas desde Process...</option>
+                        ) : processTemplates.length === 0 ? (
+                          <option value="">⚠️ No hay plantillas (Revisa tu Service Key de Process)</option>
+                        ) : (
+                          processTemplates.map(t => (
+                            <option key={t.id} value={t.id}>📄 {t.name}</option>
+                          ))
+                        )}
+                      </select>
+                      {processTemplates.find(t => t.id === selectedTemplateId)?.description && (
+                        <p style={{ margin: '0.5rem 0 0', fontSize: '0.75rem', color: '#64748b' }}>
+                          {processTemplates.find(t => t.id === selectedTemplateId)?.description}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Paso 3: Mapeo de Variables Inteligente */}
@@ -672,7 +762,16 @@ export default function IntegrationCard({
                   </label>
                   
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' }}>
-                    {targetAppConfig.actions[selectedActionIdx]?.fields.map(field => {
+                    {(() => {
+                      const activeFields = targetApp === 'process'
+                        ? (processTemplates.find(t => t.id === selectedTemplateId)?.variables || [])
+                        : (targetAppConfig.actions[selectedActionIdx]?.fields || []);
+                        
+                      if (activeFields.length === 0 && targetApp === 'process') {
+                        return <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>No hay variables requeridas para esta plantilla.</div>;
+                      }
+
+                      return activeFields.map((field: string) => {
                       const mType = mappingTypes[field] || 'static';
                       const availOutputs = currentAppConfig.triggers[selectedTriggerIdx]?.outputs || [];
                       
@@ -744,7 +843,7 @@ export default function IntegrationCard({
                           )}
                         </div>
                       );
-                    })}
+                    })})()}
                   </div>
                 </div>
 

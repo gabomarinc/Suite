@@ -194,3 +194,28 @@ export async function toggleAutomationRule(id: string, currentStatus: boolean) {
   revalidatePath('/automatizaciones');
 }
 
+export async function fetchProcessTemplates(serviceKey: string) {
+  const { isAuthenticated } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  if (!isAuth) throw new Error("No autenticado");
+
+  try {
+    const res = await fetch('https://process.konsul.digital/api/v1/templates', {
+      method: 'GET',
+      headers: {
+        'x-api-key': serviceKey,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!res.ok) {
+      return { success: false, error: 'Token inválido o error en Kônsul Process' };
+    }
+
+    const data = await res.json();
+    return { success: true, data: data.data || [] };
+  } catch (error) {
+    console.error("Error fetching templates:", error);
+    return { success: false, error: 'Error de red o CORS al contactar Process' };
+  }
+}
