@@ -22,10 +22,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: `Trigger not found: ${triggerName}` }, { status: 404 });
     }
 
+    const cleanUserId = userId.startsWith('kinde_') ? userId.replace('kinde_', '') : userId;
+
     // Find active automation rules
     const rules = await prisma.automationRule.findMany({
       where: {
-        userId,
+        userId: { in: [userId, cleanUserId] },
         sourceApp: appCode,
         triggerIdx,
         isActive: true
@@ -52,11 +54,11 @@ export async function POST(req: Request) {
         }
       }
 
-      // Fetch target integration details
+      // Fetch target integration details using the correct rule.userId
       const targetIntegration = await prisma.integration.findUnique({
         where: {
           userId_appCode: {
-            userId,
+            userId: rule.userId,
             appCode: targetApp
           }
         }
@@ -66,7 +68,7 @@ export async function POST(req: Request) {
         // Record failure
         const log = await prisma.automationLog.create({
           data: {
-            userId,
+            userId: rule.userId,
             ruleId: rule.id,
             sourceApp: appCode,
             targetApp,
@@ -88,7 +90,7 @@ export async function POST(req: Request) {
         if (!templateId) {
           const log = await prisma.automationLog.create({
             data: {
-              userId,
+              userId: rule.userId,
               ruleId: rule.id,
               sourceApp: appCode,
               targetApp,
@@ -122,7 +124,7 @@ export async function POST(req: Request) {
           if (response.ok && resData.success) {
             const log = await prisma.automationLog.create({
               data: {
-                userId,
+                userId: rule.userId,
                 ruleId: rule.id,
                 sourceApp: appCode,
                 targetApp,
@@ -137,7 +139,7 @@ export async function POST(req: Request) {
           } else {
             const log = await prisma.automationLog.create({
               data: {
-                userId,
+                userId: rule.userId,
                 ruleId: rule.id,
                 sourceApp: appCode,
                 targetApp,
@@ -154,7 +156,7 @@ export async function POST(req: Request) {
         } catch (fetchErr: any) {
           const log = await prisma.automationLog.create({
             data: {
-              userId,
+              userId: rule.userId,
               ruleId: rule.id,
               sourceApp: appCode,
               targetApp,
@@ -173,7 +175,7 @@ export async function POST(req: Request) {
         // For now, record as success/not implemented
         const log = await prisma.automationLog.create({
           data: {
-            userId,
+            userId: rule.userId,
             ruleId: rule.id,
             sourceApp: appCode,
             targetApp,
