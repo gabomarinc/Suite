@@ -3,6 +3,7 @@
 import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 
 export async function toggleIntegration(appCode: string, currentStatus: boolean) {
   const { isAuthenticated, getUser } = getKindeServerSession();
@@ -401,7 +402,7 @@ export async function retryAutomationLog(logId: string) {
           status: 'FAILED',
           errorDetails: `[Re-intento] ${errMsg}`,
           payloadSent: log.payloadSent as any,
-          responseRec: null
+          responseRec: Prisma.DbNull
         }
       });
       return { success: false, error: errMsg };
@@ -419,7 +420,7 @@ export async function retryAutomationLog(logId: string) {
         status: 'FAILED',
         errorDetails: `[Re-intento] Engine for target app ${log.targetApp} not implemented yet`,
         payloadSent: log.payloadSent as any,
-        responseRec: null
+        responseRec: Prisma.DbNull
       }
     });
     return { success: false, error: "Ejecución para esta app no está soportada todavía" };
