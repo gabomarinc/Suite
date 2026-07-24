@@ -258,18 +258,23 @@ export async function getAutomationLogs() {
     // P2021 is Prisma's error code for "Table does not exist"
     if (error.code === 'P2021' || (error.message && error.message.includes('does not exist'))) {
       console.log('AutomationLog table not found. Creating it now...');
+      // Drop any incorrect table if exists and create the correct one matching schema.prisma
       await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "AutomationLog" (
+        DROP TABLE IF EXISTS "AutomationLog" CASCADE;
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE "AutomationLog" (
           "id" TEXT NOT NULL,
           "userId" TEXT NOT NULL,
+          "ruleId" TEXT NOT NULL,
           "sourceApp" TEXT NOT NULL,
           "targetApp" TEXT NOT NULL,
-          "triggerEvent" TEXT NOT NULL,
-          "actionEvent" TEXT NOT NULL,
+          "triggerName" TEXT NOT NULL,
+          "actionName" TEXT NOT NULL,
           "status" TEXT NOT NULL,
+          "errorDetails" TEXT,
           "payloadSent" JSONB NOT NULL,
-          "responseReceived" JSONB,
-          "errorMessage" TEXT,
+          "responseRec" JSONB,
           "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT "AutomationLog_pkey" PRIMARY KEY ("id")
         );

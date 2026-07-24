@@ -221,7 +221,7 @@ export default function IntegrationCard({
   const handleAddRule = async (e: React.FormEvent) => {
     e.preventDefault();
     const actionFields = targetApp === 'process'
-      ? (processTemplates.find(t => t.id === selectedTemplateId)?.variables || [])
+      ? (processTemplates.find(t => t.id === selectedTemplateId)?.variables || []).filter(v => v !== 'Miembro Involucrado (Email)')
       : (targetAppConfig.actions[selectedActionIdx]?.fields || []);
     
     // Build mappings object
@@ -740,7 +740,7 @@ export default function IntegrationCard({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' }}>
                     {(() => {
                       const activeFields = targetApp === 'process'
-                        ? (processTemplates.find(t => t.id === selectedTemplateId)?.variables || [])
+                        ? (processTemplates.find(t => t.id === selectedTemplateId)?.variables || []).filter(v => v !== 'Miembro Involucrado (Email)')
                         : (targetAppConfig.actions[selectedActionIdx]?.fields || []);
                         
                       if (activeFields.length === 0) {
