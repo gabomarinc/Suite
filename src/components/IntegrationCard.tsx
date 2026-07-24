@@ -33,6 +33,7 @@ interface IntegrationCardProps {
 
 interface AutomationRule {
   id: string;
+  userId: string;
   isActive: boolean;
   sourceApp: string;
   triggerIdx: number;
@@ -260,6 +261,70 @@ export default function IntegrationCard({
     } catch (err) {
       console.error(err);
       alert('Error al guardar la regla en la base de datos.');
+    }
+  };
+
+  const handleTestRuleTrigger = async (rule: AutomationRule) => {
+    const srcAppObj = ALL_APPS[rule.sourceApp];
+    const trigName = srcAppObj?.triggers[rule.triggerIdx]?.name || '';
+
+    // Build mock data based on trigger type
+    let mockData: Record<string, string> = {};
+    if (rule.sourceApp === 'bills') {
+      if (trigName === 'Nuevo Cliente o Prospecto') {
+        mockData = {
+          'Nombre del Cliente': 'Cliente de Prueba Manual',
+          'Email del Cliente': 'test-manual@suite.com',
+          'Teléfono': '+507 6000-1111',
+          'Fecha de Creación': new Date().toISOString()
+        };
+      } else if (trigName === 'Documento Creado (Factura/Cotización)') {
+        mockData = {
+          'Nombre del Cliente': 'Cliente Manual Factura S.A.',
+          'Email del Cliente': 'cliente-factura-manual@suite.com',
+          'Monto Total': '850.00',
+          'Concepto de Venta': 'Servicio Técnico de Servidores',
+          'Fecha de Creación': new Date().toISOString()
+        };
+      } else {
+        mockData = {
+          'Nombre del Cliente': 'Prueba Genérica',
+          'Email del Cliente': 'test-generic@suite.com',
+          'Fecha de Creación': new Date().toISOString()
+        };
+      }
+    } else {
+      mockData = {
+        'Título de Tarea': 'Tarea de Prueba Automatizada',
+        'Descripción': 'Creada mediante el botón Probar de la Suite',
+        'Fecha de Creación': new Date().toISOString()
+      };
+    }
+
+    try {
+      const response = await fetch('/api/v1/automations/trigger', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          appCode: rule.sourceApp,
+          triggerName: trigName,
+          userId: rule.userId, // Send the rule's userId directly
+          data: mockData
+        })
+      });
+
+      const resData = await response.json();
+
+      if (response.ok && resData.success) {
+        alert(`🧪 ¡Prueba disparada con éxito!\n\nSe procesó la regla y se envió la acción.\nRevisa el Historial (Logs) para ver los resultados.`);
+      } else {
+        alert(`❌ Fallo al disparar la prueba: ${resData.error || 'Error desconocido'}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(`❌ Error de red al disparar la prueba: ${err.message || err}`);
     }
   };
 
@@ -916,6 +981,26 @@ export default function IntegrationCard({
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleTestRuleTrigger(rule)}
+                              style={{
+                                background: '#eff6ff',
+                                border: '1px solid #bfdbfe',
+                                color: '#2563eb',
+                                padding: '0.25rem 0.6rem',
+                                borderRadius: '6px',
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.2rem'
+                              }}
+                            >
+                              🧪 Probar
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleToggleRule(rule.id)}
