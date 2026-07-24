@@ -247,10 +247,40 @@ export async function getAutomationLogs() {
   const user = await getUser();
   if (!user || !user.id) return [];
 
-  return await prisma.automationLog.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: 'desc' },
-    take: 50
-  });
+  try {
+    const logs = await prisma.automationLog.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    });
+    return JSON.parse(JSON.stringify(logs));
+  } catch (error: any) {
+    // P2021 is Prisma's error code for "Table does not exist"
+    if (error.code === 'P2021' || (error.message && error.message.includes('does not exist'))) {
+      console.log('AutomationLog table not found. Creating it now...');
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "AutomationLog" (
+          "id" TEXT NOT NULL,
+          "userId" TEXT NOT NULL,
+          "sourceApp" TEXT NOT NULL,
+          "targetApp" TEXT NOT NULL,
+          "triggerEvent" TEXT NOT NULL,
+          "actionEvent" TEXT NOT NULL,
+          "status" TEXT NOT NULL,
+          "payloadSent" JSONB NOT NULL,
+          "responseReceived" JSONB,
+          "errorMessage" TEXT,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "AutomationLog_pkey" PRIMARY KEY ("id")
+        );
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS "AutomationLog_userId_idx" ON "AutomationLog"("userId");
+      `);
+      return [];
+    }
+    console.error("Error fetching automation logs:", error);
+    return [];
+  }
 }
 
