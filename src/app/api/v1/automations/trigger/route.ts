@@ -3,23 +3,43 @@ import { prisma } from '@/lib/prisma';
 import { ALL_APPS } from '@/lib/appsConfig';
 import { Prisma } from '@prisma/client';
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key, x-user-id',
+};
+
+function jsonResponse(data: any, init?: ResponseInit) {
+  return NextResponse.json(data, {
+    ...init,
+    headers: {
+      ...init?.headers,
+      ...CORS_HEADERS,
+    },
+  });
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
 export async function POST(req: Request) {
   try {
     const { appCode, triggerName, userId, data } = await req.json();
 
     if (!appCode || !triggerName || !userId) {
-      return NextResponse.json({ success: false, error: "Missing parameters" }, { status: 400 });
+      return jsonResponse({ success: false, error: "Missing parameters" }, { status: 400 });
     }
 
     // Resolve triggerIdx from triggerName
     const appConfig = ALL_APPS[appCode];
     if (!appConfig) {
-      return NextResponse.json({ success: false, error: `App config not found for ${appCode}` }, { status: 404 });
+      return jsonResponse({ success: false, error: `App config not found for ${appCode}` }, { status: 404 });
     }
 
     const triggerIdx = appConfig.triggers.findIndex(t => t.name === triggerName);
     if (triggerIdx === -1) {
-      return NextResponse.json({ success: false, error: `Trigger not found: ${triggerName}` }, { status: 404 });
+      return jsonResponse({ success: false, error: `Trigger not found: ${triggerName}` }, { status: 404 });
     }
 
     const cleanUserId = userId.startsWith('kinde_') ? userId.replace('kinde_', '') : userId;
@@ -191,9 +211,9 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ success: true, processedRulesCount: rules.length, results: executionResults });
+    return jsonResponse({ success: true, processedRulesCount: rules.length, results: executionResults });
   } catch (error: any) {
     console.error("Automation Trigger Error:", error);
-    return NextResponse.json({ success: false, error: error.message || 'Internal Server Error' }, { status: 500 });
+    return jsonResponse({ success: false, error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }
