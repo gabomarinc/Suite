@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getAutomationLogs } from '../actions';
+import { getAutomationLogs, retryAutomationLog } from '../actions';
 import { ALL_APPS, APP_NAMES_MAP } from '@/lib/appsConfig';
 
 interface AutomationLog {
@@ -24,20 +24,74 @@ export default function AutomationLogsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState<AutomationLog | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [retryingIds, setRetryingIds] = useState<Record<string, boolean>>({});
+
+  const fetchLogs = async () => {
+    try {
+      const data = await getAutomationLogs();
+      setLogs(data as unknown as AutomationLog[]);
+    } catch (err) {
+      console.error("Error loading logs:", err);
+    }
+  };
 
   useEffect(() => {
-    async function loadLogs() {
+    setLoading(true);
+    fetchLogs().finally(() => setLoading(false));
+  }, []);
+
+  const handleRetry = async (logId: string) => {
+    setRetryingIds(prev => ({ ...prev, [logId]: true }));
+    try {
+      const result = await retryAutomationLog(logId);
+      if (result.success) {
+        alert("¡Re-intento exitoso! Se ha registrado una nueva ejecución en el historial.");
+        await fetchLogs();
+        if (selectedLog && selectedLog.id === logId) {
+          setSelectedLog(null); // Close the inspector
+        }
+      } else {
+        alert(`Fallo en el re-intento: ${result.error}`);
+        await fetchLogs();
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error al re-ejecutar: ${err.message || err}`);
+    } finally {
+      setRetryingIds(prev => ({ ...prev, [logId]: false }));
+    }
+  };
+
+  const handleRetryAllFailed = async () => {
+    const failedLogs = logs.filter(l => l.status === 'FAILED');
+    if (failedLogs.length === 0) {
+      alert("No hay ejecuciones fallidas en el historial para re-intentar.");
+      return;
+    }
+    if (!confirm(`¿Estás seguro de que deseas re-intentar las ${failedLogs.length} ejecuciones fallidas?`)) {
+      return;
+    }
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    // Execute sequentially
+    for (const log of failedLogs) {
+      setRetryingIds(prev => ({ ...prev, [log.id]: true }));
       try {
-        const data = await getAutomationLogs();
-        setLogs(data as unknown as AutomationLog[]);
-      } catch (err) {
-        console.error("Error loading logs:", err);
+        const result = await retryAutomationLog(log.id);
+        if (result.success) successCount++;
+        else failCount++;
+      } catch (e) {
+        failCount++;
       } finally {
-        setLoading(false);
+        setRetryingIds(prev => ({ ...prev, [log.id]: false }));
       }
     }
-    loadLogs();
-  }, []);
+    
+    alert(`Proceso completado. Éxitos: ${successCount}, Fallidos: ${failCount}`);
+    await fetchLogs();
+  };
 
   const filteredLogs = logs.filter(log => {
     if (filterStatus === 'ALL') return true;
@@ -61,25 +115,48 @@ export default function AutomationLogsPage() {
             <h2>Historial de Ejecuciones</h2>
             <p className="header-subtitle">Monitorea y depura en tiempo real los flujos de comunicación entre tus micro-SaaS.</p>
           </div>
-          <Link 
-            href="/automatizaciones" 
-            style={{
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              color: '#334155',
-              padding: '0.55rem 1rem',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              textDecoration: 'none',
-              transition: 'all 0.2s',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            ← Volver a Conexiones
-          </Link>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {logs.some(l => l.status === 'FAILED') && (
+              <button
+                onClick={handleRetryAllFailed}
+                style={{
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '0.55rem 1rem',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  transition: 'all 0.2s'
+                }}
+              >
+                🔄 Re-procesar Fallidos
+              </button>
+            )}
+            <Link 
+              href="/automatizaciones" 
+              style={{
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                color: '#334155',
+                padding: '0.55rem 1rem',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                textDecoration: 'none',
+                transition: 'all 0.2s',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              ← Volver a Conexiones
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -190,7 +267,7 @@ export default function AutomationLogsPage() {
                       <div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#0f172a' }}>{log.triggerName}</div>
                       <div style={{ fontSize: '0.75rem', color: '#64748b' }}>→ {log.actionName}</div>
                     </td>
-                    <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
+                    <td style={{ padding: '1rem 1.5rem', textAlign: 'right', display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
                       <button
                         onClick={() => setSelectedLog(log)}
                         style={{
@@ -206,6 +283,23 @@ export default function AutomationLogsPage() {
                         }}
                       >
                         Inspeccionar
+                      </button>
+                      <button
+                        onClick={() => handleRetry(log.id)}
+                        disabled={retryingIds[log.id]}
+                        style={{
+                          background: retryingIds[log.id] ? '#f1f5f9' : '#eff6ff',
+                          border: '1px solid #bfdbfe',
+                          color: retryingIds[log.id] ? '#94a3b8' : '#2563eb',
+                          padding: '0.35rem 0.75rem',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: retryingIds[log.id] ? 'not-allowed' : 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {retryingIds[log.id] ? '⌛...' : '🔄 Re-ejecutar'}
                       </button>
                     </td>
                   </tr>
@@ -327,13 +421,30 @@ export default function AutomationLogsPage() {
             </div>
 
             {/* Modal Footer */}
-            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', background: '#f8fafc' }}>
+            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', background: '#f8fafc' }}>
+              <button
+                onClick={() => handleRetry(selectedLog.id)}
+                disabled={retryingIds[selectedLog.id]}
+                style={{
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '0.5rem 1.25rem',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: retryingIds[selectedLog.id] ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {retryingIds[selectedLog.id] ? '⌛ Re-ejecutando...' : '🔄 Re-ejecutar Flujo'}
+              </button>
               <button
                 onClick={() => setSelectedLog(null)}
                 style={{
-                  background: '#0f172a',
-                  color: '#ffffff',
-                  border: 'none',
+                  background: '#f1f5f9',
+                  color: '#334155',
+                  border: '1px solid #cbd5e1',
                   padding: '0.5rem 1.25rem',
                   borderRadius: '6px',
                   fontSize: '0.8rem',

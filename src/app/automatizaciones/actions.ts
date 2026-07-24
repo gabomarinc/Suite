@@ -289,3 +289,140 @@ export async function getAutomationLogs() {
   }
 }
 
+export async function retryAutomationLog(logId: string) {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  if (!isAuth) throw new Error("No autenticado");
+
+  const user = await getUser();
+  if (!user || !user.id) throw new Error("Usuario no encontrado");
+
+  // Find the log
+  const log = await prisma.automationLog.findUnique({
+    where: { id: logId }
+  });
+
+  if (!log || log.userId !== user.id) {
+    throw new Error("Log no encontrado o sin permisos");
+  }
+
+  // Get the active integration for targetApp
+  const targetIntegration = await prisma.integration.findUnique({
+    where: {
+      userId_appCode: {
+        userId: user.id,
+        appCode: log.targetApp
+      }
+    }
+  });
+
+  if (!targetIntegration || !targetIntegration.isActive || !targetIntegration.serviceKey) {
+    throw new Error(`La integración destino ${log.targetApp} no está activa o le falta la API Key`);
+  }
+
+  // Re-run the action fetch call based on targetApp
+  if (log.targetApp === 'process') {
+    // Find the rule to get the templateId from mappings
+    const rule = await prisma.automationRule.findUnique({
+      where: { id: log.ruleId }
+    });
+    
+    // Fallback templateId from mapping if rule was deleted
+    const mappings = rule ? (rule.mappings as Record<string, string>) : (log.payloadSent as Record<string, string>);
+    const templateId = mappings['__templateId'] || (log.payloadSent as any)?.__templateId;
+
+    if (!templateId) {
+      throw new Error("No se encontró el ID de la plantilla para re-ejecutar");
+    }
+
+    // Clean payload of __templateId for the variables field
+    const variablesToSend = { ...(log.payloadSent as Record<string, string>) };
+    delete variablesToSend['__templateId'];
+
+    try {
+      const response = await fetch('https://process.konsul.digital/api/v1/templates/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': targetIntegration.serviceKey
+        },
+        body: JSON.stringify({
+          template_id: templateId,
+          variables: variablesToSend
+        })
+      });
+
+      const resData = await response.json();
+
+      if (response.ok && resData.success) {
+        // Create a new log for the retry
+        await prisma.automationLog.create({
+          data: {
+            userId: user.id,
+            ruleId: log.ruleId,
+            sourceApp: log.sourceApp,
+            targetApp: log.targetApp,
+            triggerName: log.triggerName,
+            actionName: log.actionName,
+            status: 'SUCCESS',
+            payloadSent: log.payloadSent as any,
+            responseRec: resData
+          }
+        });
+        return { success: true, message: "Re-ejecución exitosa" };
+      } else {
+        const errMsg = resData.error?.message || resData.error || 'Error desconocido';
+        await prisma.automationLog.create({
+          data: {
+            userId: user.id,
+            ruleId: log.ruleId,
+            sourceApp: log.sourceApp,
+            targetApp: log.targetApp,
+            triggerName: log.triggerName,
+            actionName: log.actionName,
+            status: 'FAILED',
+            errorDetails: `[Re-intento] ${errMsg}`,
+            payloadSent: log.payloadSent as any,
+            responseRec: resData
+          }
+        });
+        return { success: false, error: errMsg };
+      }
+    } catch (fetchErr: any) {
+      const errMsg = fetchErr.message || 'Error de red en fetch';
+      await prisma.automationLog.create({
+        data: {
+          userId: user.id,
+          ruleId: log.ruleId,
+          sourceApp: log.sourceApp,
+          targetApp: log.targetApp,
+          triggerName: log.triggerName,
+          actionName: log.actionName,
+          status: 'FAILED',
+          errorDetails: `[Re-intento] ${errMsg}`,
+          payloadSent: log.payloadSent as any,
+          responseRec: null
+        }
+      });
+      return { success: false, error: errMsg };
+    }
+  } else {
+    // Other apps placeholder
+    await prisma.automationLog.create({
+      data: {
+        userId: user.id,
+        ruleId: log.ruleId,
+        sourceApp: log.sourceApp,
+        targetApp: log.targetApp,
+        triggerName: log.triggerName,
+        actionName: log.actionName,
+        status: 'FAILED',
+        errorDetails: `[Re-intento] Engine for target app ${log.targetApp} not implemented yet`,
+        payloadSent: log.payloadSent as any,
+        responseRec: null
+      }
+    });
+    return { success: false, error: "Ejecución para esta app no está soportada todavía" };
+  }
+}
+
