@@ -219,3 +219,22 @@ export async function fetchProcessTemplates(serviceKey: string) {
     return { success: false, error: 'Error de red o CORS al contactar Process' };
   }
 }
+
+export async function getConnectedIntegrations() {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  if (!isAuth) return [];
+
+  const user = await getUser();
+  if (!user || !user.id) return [];
+
+  const integrations = await prisma.integration.findMany({
+    where: { userId: user.id }
+  });
+  return integrations.map(i => ({
+    appCode: i.appCode,
+    serviceKey: i.serviceKey,
+    isActive: i.isActive
+  }));
+}
+

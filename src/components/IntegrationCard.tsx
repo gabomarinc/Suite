@@ -9,7 +9,8 @@ import {
   deleteAutomationRule,
   toggleAutomationRule,
   getAutomationRules,
-  fetchProcessTemplates
+  fetchProcessTemplates,
+  getConnectedIntegrations
 } from '../app/automatizaciones/actions';
 
 interface AppItem {
@@ -153,6 +154,7 @@ export default function IntegrationCard({
   const [processTemplates, setProcessTemplates] = useState<any[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [connectedIntegrations, setConnectedIntegrations] = useState<any[]>([]);
   
   // Mapeos de campos del formulario
   const [mappingValues, setMappingValues] = useState<Record<string, string>>({});
@@ -164,6 +166,35 @@ export default function IntegrationCard({
   useEffect(() => {
     setRules(initialRules);
   }, [initialRules]);
+
+  // Fetch all integrations on mount and listen to updates
+  const fetchIntegrations = async () => {
+    try {
+      const integrations = await getConnectedIntegrations();
+      setConnectedIntegrations(integrations);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    fetchIntegrations();
+    window.addEventListener('konsul_integrations_updated', fetchIntegrations);
+    return () => window.removeEventListener('konsul_integrations_updated', fetchIntegrations);
+  }, []);
+
+  // Update default targetApp when integrations are loaded or updated
+  useEffect(() => {
+    const active = connectedIntegrations.filter(i => i.isActive && i.serviceKey);
+    if (active.length > 0) {
+      // If current targetApp is not active/connected, select the first active one
+      if (!targetApp || !active.some(a => a.appCode === targetApp)) {
+        setTargetApp(active[0].appCode);
+      }
+    } else {
+      setTargetApp('');
+    }
+  }, [connectedIntegrations, targetApp]);
 
   // Listener to keep cards in sync using Server Actions
   useEffect(() => {
@@ -179,11 +210,14 @@ export default function IntegrationCard({
     return () => window.removeEventListener('konsul_rules_updated', handleRulesUpdate);
   }, []);
 
-  // Fetch Process templates when targetApp is set to 'process'
+  // Fetch Process templates when targetApp is set to 'process' using target app's API key
   useEffect(() => {
-    if (targetApp === 'process' && serviceKey) {
+    const targetIntegration = connectedIntegrations.find(i => i.appCode === targetApp);
+    const targetServiceKey = targetIntegration?.serviceKey;
+
+    if (targetApp === 'process' && targetServiceKey) {
       setIsLoadingTemplates(true);
-      fetchProcessTemplates(serviceKey)
+      fetchProcessTemplates(targetServiceKey)
         .then(res => {
           if (res.success) {
             setProcessTemplates(res.data);
@@ -192,19 +226,27 @@ export default function IntegrationCard({
             }
           } else {
             console.error(res.error);
+            setProcessTemplates([]);
           }
+        })
+        .catch(err => {
+          console.error(err);
+          setProcessTemplates([]);
         })
         .finally(() => {
           setIsLoadingTemplates(false);
         });
+    } else {
+      setProcessTemplates([]);
     }
-  }, [targetApp, serviceKey, isModalOpen]);
+  }, [targetApp, connectedIntegrations, isModalOpen]);
 
 
   const handleToggle = async () => {
     try {
       await toggleIntegration(app.code, isActive);
       setIsActive(!isActive);
+      window.dispatchEvent(new Event('konsul_integrations_updated'));
     } catch (e) {
       console.error(e);
     }
@@ -220,6 +262,7 @@ export default function IntegrationCard({
       setInputKey(trimmedKey);
       setIsActive(!!trimmedKey);
       setTestStatus('success'); // default verified status once saved
+      window.dispatchEvent(new Event('konsul_integrations_updated'));
     } catch (e) {
       console.error(e);
     } finally {
@@ -341,6 +384,9 @@ export default function IntegrationCard({
 
   // Filter rules relevant to this current app card (either as origin or destination)
   const currentAppRules = rules.filter(r => r.sourceApp === app.code || r.targetApp === app.code);
+
+  const activeConnectedTargetApps = connectedIntegrations.filter(i => i.isActive && i.serviceKey);
+  const hasActiveTargetApps = activeConnectedTargetApps.length > 0;
 
   return (
     <div className="card-premium integration-card">
@@ -657,61 +703,79 @@ export default function IntegrationCard({
                     2. ACCIÓN (DESTINO)
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.5rem' }}>
-                    <select
-                      value={targetApp}
-                      onChange={(e) => {
-                        setTargetApp(e.target.value);
-                        setSelectedActionIdx(0);
-                        setMappingValues({});
-                        setMappingTypes({});
-                      }}
-                      style={{
-                        padding: '0.55rem',
-                        fontSize: '0.85rem',
-                        background: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '6px',
-                        fontWeight: 600
-                      }}
-                    >
-                      {Object.keys(ALL_APPS).map(code => (
-                        <option key={code} value={code}>{ALL_APPS[code].name}</option>
-                      ))}
-                    </select>
-                    {targetApp === 'process' ? (
-                      <select
-                        disabled
-                        style={{
-                          padding: '0.55rem',
-                          fontSize: '0.85rem',
-                          background: '#f8fafc',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '6px',
-                          color: '#475569'
-                        }}
-                      >
-                        <option>Ejecutar Plantilla de Proceso</option>
-                      </select>
+                    {hasActiveTargetApps ? (
+                      <>
+                        <select
+                          value={targetApp}
+                          onChange={(e) => {
+                            setTargetApp(e.target.value);
+                            setSelectedActionIdx(0);
+                            setMappingValues({});
+                            setMappingTypes({});
+                          }}
+                          style={{
+                            padding: '0.55rem',
+                            fontSize: '0.85rem',
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '6px',
+                            fontWeight: 600
+                          }}
+                        >
+                          {activeConnectedTargetApps.map(i => (
+                            <option key={i.appCode} value={i.appCode}>{ALL_APPS[i.appCode]?.name || i.appCode}</option>
+                          ))}
+                        </select>
+                        {targetApp === 'process' ? (
+                          <select
+                            disabled
+                            style={{
+                              padding: '0.55rem',
+                              fontSize: '0.85rem',
+                              background: '#f8fafc',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              color: '#475569'
+                            }}
+                          >
+                            <option>Ejecutar Plantilla de Proceso</option>
+                          </select>
+                        ) : (
+                          <select
+                            value={selectedActionIdx}
+                            onChange={(e) => {
+                              setSelectedActionIdx(parseInt(e.target.value));
+                              setMappingValues({});
+                              setMappingTypes({});
+                            }}
+                            style={{
+                              padding: '0.55rem',
+                              fontSize: '0.85rem',
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px'
+                            }}
+                          >
+                            {targetAppConfig.actions.map((act, idx) => (
+                              <option key={idx} value={idx}>{act.name}</option>
+                            ))}
+                          </select>
+                        )}
+                      </>
                     ) : (
-                      <select
-                        value={selectedActionIdx}
-                        onChange={(e) => {
-                          setSelectedActionIdx(parseInt(e.target.value));
-                          setMappingValues({});
-                          setMappingTypes({});
-                        }}
-                        style={{
-                          padding: '0.55rem',
-                          fontSize: '0.85rem',
-                          background: '#ffffff',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '6px'
-                        }}
-                      >
-                        {targetAppConfig.actions.map((act, idx) => (
-                          <option key={idx} value={idx}>{act.name}</option>
-                        ))}
-                      </select>
+                      <div style={{
+                        gridColumn: '1 / span 2',
+                        padding: '0.75rem',
+                        background: '#fff1f2',
+                        border: '1px dashed #fecdd3',
+                        borderRadius: '6px',
+                        color: '#be123c',
+                        fontSize: '0.8rem',
+                        textAlign: 'center',
+                        fontWeight: 500
+                      }}>
+                        ⚠️ No hay otras aplicaciones configuradas y activas para automatizar. Conecta y activa alguna otra app en el dashboard primero.
+                      </div>
                     )}
                   </div>
 
@@ -767,8 +831,16 @@ export default function IntegrationCard({
                         ? (processTemplates.find(t => t.id === selectedTemplateId)?.variables || [])
                         : (targetAppConfig.actions[selectedActionIdx]?.fields || []);
                         
-                      if (activeFields.length === 0 && targetApp === 'process') {
-                        return <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>No hay variables requeridas para esta plantilla.</div>;
+                      if (activeFields.length === 0) {
+                        return (
+                          <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
+                            {!targetApp 
+                              ? 'Selecciona una aplicación de destino activa para configurar campos.' 
+                              : targetApp === 'process' 
+                                ? 'No hay variables requeridas para esta plantilla.' 
+                                : 'No hay campos que configurar para esta acción.'}
+                          </div>
+                        );
                       }
 
                       return activeFields.map((field: string) => {
@@ -849,15 +921,16 @@ export default function IntegrationCard({
 
                 <button
                   type="submit"
+                  disabled={!hasActiveTargetApps}
                   style={{
-                    background: app.color,
+                    background: hasActiveTargetApps ? app.color : '#cbd5e1',
                     color: '#ffffff',
                     border: 'none',
                     padding: '0.6rem 1.2rem',
                     borderRadius: '6px',
                     fontSize: '0.8rem',
                     fontWeight: 700,
-                    cursor: 'pointer',
+                    cursor: hasActiveTargetApps ? 'pointer' : 'not-allowed',
                     alignSelf: 'flex-start',
                     boxShadow: `0 4px 10px rgba(0, 0, 0, 0.05)`
                   }}
