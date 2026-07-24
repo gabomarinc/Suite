@@ -238,3 +238,18 @@ export async function getConnectedIntegrations() {
   }));
 }
 
+export async function getAutomationLogs() {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  if (!isAuth) return [];
+
+  const user = await getUser();
+  if (!user || !user.id) return [];
+
+  return await prisma.automationLog.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: 'desc' },
+    take: 50
+  });
+}
+

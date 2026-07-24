@@ -1,5 +1,6 @@
 import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import IntegrationCard from "@/components/IntegrationCard";
 
@@ -101,11 +102,30 @@ export default async function AutomatizacionesPage() {
           <span className="active">Automatizaciones</span>
         </div>
         
-        <div className="settings-title-section">
+        <div className="settings-title-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h2>Kônsul Connect</h2>
             <p className="header-subtitle">Conecta las micro-SaaS del ecosistema de manera plug-and-play usando keys de servicio.</p>
           </div>
+          <Link 
+            href="/automatizaciones/logs" 
+            style={{
+              background: '#0f172a',
+              color: '#ffffff',
+              padding: '0.6rem 1.2rem',
+              borderRadius: '8px',
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              textDecoration: 'none',
+              transition: 'all 0.2s',
+              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            📋 Ver Historial (Logs)
+          </Link>
         </div>
       </div>
 
