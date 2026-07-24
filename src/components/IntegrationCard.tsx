@@ -61,9 +61,9 @@ const ALL_APPS: Record<string, AppConfig> = {
     name: 'Kônsul Bills',
     code: 'bills',
     triggers: [
-      { name: 'Documento Creado (Factura/Cotización)', description: 'Se dispara al crearse una factura o cotización en Bills.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta'] },
-      { name: 'Estado de Factura Actualizado', description: 'Se dispara cuando una factura cambia a Pagada, Aceptada o Incobrable.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta', 'Nuevo Estado'] },
-      { name: 'Nuevo Cliente o Prospecto', description: 'Se dispara al crear un nuevo cliente o prospecto.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Teléfono'] }
+      { name: 'Documento Creado (Factura/Cotización)', description: 'Se dispara al crearse una factura o cotización en Bills.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta', 'Fecha de Creación'] },
+      { name: 'Estado de Factura Actualizado', description: 'Se dispara cuando una factura cambia a Pagada, Aceptada o Incobrable.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta', 'Nuevo Estado', 'Fecha de Creación'] },
+      { name: 'Nuevo Cliente o Prospecto', description: 'Se dispara al crear un nuevo cliente o prospecto.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Teléfono', 'Fecha de Creación'] }
     ],
     actions: [
       { name: 'Crear Factura o Cotización', description: 'POST /api/v1/invoices - Genera factura o cotización.', fields: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta'] },
