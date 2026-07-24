@@ -202,6 +202,7 @@ export async function fetchProcessTemplates(serviceKey: string) {
   try {
     const res = await fetch('https://process.konsul.digital/api/v1/templates', {
       method: 'GET',
+      cache: 'no-store',
       headers: {
         'x-api-key': serviceKey,
         'Content-Type': 'application/json'
