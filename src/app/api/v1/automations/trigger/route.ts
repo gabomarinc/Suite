@@ -25,7 +25,7 @@ export async function OPTIONS() {
 
 export async function POST(req: Request) {
   try {
-    const { appCode, triggerName, userId, data } = await req.json();
+    const { appCode, triggerName, userId, data = {} } = await req.json();
 
     if (!appCode || !triggerName || !userId) {
       return jsonResponse({ success: false, error: "Missing parameters" }, { status: 400 });
@@ -72,15 +72,15 @@ export async function POST(req: Request) {
 
     for (const rule of rules) {
       const targetApp = rule.targetApp;
-      const mappings = rule.mappings as Record<string, string>;
-      const mappingTypes = rule.mappingTypes as Record<string, 'field' | 'static'>;
+      const mappings = (rule.mappings as Record<string, string>) || {};
+      const mappingTypes = (rule.mappingTypes as Record<string, 'field' | 'static'>) || {};
 
       // Resolve payload
       const resolvedVariables: Record<string, string> = {};
       for (const [field, targetVal] of Object.entries(mappings)) {
         if (field === '__templateId') continue;
         
-        const type = mappingTypes[field];
+        const type = mappingTypes[field] || 'field';
         if (type === 'field') {
           resolvedVariables[field] = data[targetVal] || '';
         } else {
