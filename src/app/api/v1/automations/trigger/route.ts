@@ -44,10 +44,24 @@ export async function POST(req: Request) {
 
     const cleanUserId = userId.startsWith('kinde_') ? userId.replace('kinde_', '') : userId;
 
+    // Resolve target userId using either id or legacyId to bridge Kinde IDs with Bills legacy IDs
+    const dbUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: userId },
+          { legacyId: userId },
+          { id: cleanUserId },
+          { legacyId: cleanUserId }
+        ]
+      }
+    });
+
+    const resolvedUserId = dbUser ? dbUser.id : cleanUserId;
+
     // Find active automation rules
     const rules = await prisma.automationRule.findMany({
       where: {
-        userId: { in: [userId, cleanUserId] },
+        userId: { in: [userId, cleanUserId, resolvedUserId] },
         sourceApp: appCode,
         triggerIdx,
         isActive: true
