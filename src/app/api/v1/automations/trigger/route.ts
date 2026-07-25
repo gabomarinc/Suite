@@ -204,6 +204,128 @@ export async function POST(req: Request) {
           });
           executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });
         }
+      } else if (targetApp === 'bills') {
+        const actionConfig = ALL_APPS.bills.actions[rule.actionIdx];
+        const actionName = actionConfig?.name || 'Acción en Bills';
+
+        const billsUrl = process.env.NEXT_PUBLIC_BILLS_URL || 'https://bills.konsul.digital';
+        let endpoint = `${billsUrl}/api/v1/invoices`;
+        let method = 'POST';
+        let payload: any = {};
+
+        if (actionName === 'Crear Factura o Cotización') {
+          endpoint = `${billsUrl}/api/v1/invoices`;
+          method = 'POST';
+          payload = {
+            clientName: resolvedVariables['Nombre del Cliente'],
+            clientEmail: resolvedVariables['Email del Cliente'],
+            total: resolvedVariables['Monto Total'],
+            concept: resolvedVariables['Concepto de Venta'],
+            type: 'Invoice',
+            status: 'Creada'
+          };
+        } else if (actionName === 'Actualizar Estado de Factura') {
+          endpoint = `${billsUrl}/api/v1/invoices`;
+          method = 'PUT';
+          payload = {
+            id: resolvedVariables['ID de Factura'],
+            status: resolvedVariables['Nuevo Estado']
+          };
+        } else if (actionName === 'Crear o Actualizar Cliente') {
+          endpoint = `${billsUrl}/api/v1/clients`;
+          method = 'POST';
+          payload = {
+            name: resolvedVariables['Nombre del Cliente'],
+            email: resolvedVariables['Email del Cliente'],
+            phone: resolvedVariables['Teléfono'],
+            notes: resolvedVariables['Notas']
+          };
+        } else if (actionName === 'Añadir etiqueta a un cliente') {
+          endpoint = `${billsUrl}/api/v1/clients`;
+          method = 'POST';
+          payload = {
+            action: 'add_tag',
+            email: resolvedVariables['Email del Cliente'],
+            tags: resolvedVariables['Etiquetas']
+          };
+        } else if (actionName === 'Añadir nota interna a un cliente') {
+          endpoint = `${billsUrl}/api/v1/clients`;
+          method = 'POST';
+          payload = {
+            action: 'add_note',
+            email: resolvedVariables['Email del Cliente'],
+            notes: resolvedVariables['Notas']
+          };
+        } else if (actionName === 'Enviar recordatorio de pago al cliente (vía email)') {
+          endpoint = `${billsUrl}/api/v1/invoices`;
+          method = 'POST';
+          payload = {
+            action: 'remind',
+            id: resolvedVariables['ID de Factura']
+          };
+        }
+
+        try {
+          const response = await fetch(endpoint, {
+            method,
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': targetIntegration.serviceKey
+            },
+            body: JSON.stringify(payload)
+          });
+
+          const resData = await response.json();
+
+          if (response.ok && resData.success) {
+            const log = await prisma.automationLog.create({
+              data: {
+                userId: rule.userId,
+                ruleId: rule.id,
+                sourceApp: appCode,
+                targetApp,
+                triggerName,
+                actionName,
+                status: 'SUCCESS',
+                payloadSent: payload,
+                responseRec: resData
+              }
+            });
+            executionResults.push({ ruleId: rule.id, status: 'SUCCESS', logId: log.id });
+          } else {
+            const log = await prisma.automationLog.create({
+              data: {
+                userId: rule.userId,
+                ruleId: rule.id,
+                sourceApp: appCode,
+                targetApp,
+                triggerName,
+                actionName,
+                status: 'FAILED',
+                errorDetails: resData.error || 'Unknown error response from Bills API',
+                payloadSent: payload,
+                responseRec: resData
+              }
+            });
+            executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });
+          }
+        } catch (fetchErr: any) {
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName,
+              status: 'FAILED',
+              errorDetails: fetchErr.message || 'Network error executing trigger fetch call to Bills',
+              payloadSent: payload,
+              responseRec: Prisma.DbNull
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });
+        }
       } else {
         // Other target apps placeholder (Mailing, Kredit, Reactivaleads, etc.)
         // For now, record as success/not implemented

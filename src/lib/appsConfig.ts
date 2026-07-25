@@ -20,12 +20,28 @@ export const ALL_APPS: Record<string, AppConfig> = {
     triggers: [
       { name: 'Documento Creado (Factura/Cotización)', description: 'Se dispara al crearse una factura o cotización en Bills.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta', 'Fecha de Creación'] },
       { name: 'Estado de Factura Actualizado', description: 'Se dispara cuando una factura cambia a Pagada, Aceptada o Incobrable.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta', 'Nuevo Estado', 'Fecha de Creación'] },
-      { name: 'Nuevo Cliente o Prospecto', description: 'Se dispara al crear un nuevo cliente o prospecto.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Teléfono', 'Fecha de Creación'] }
+      { name: 'Nuevo Cliente o Prospecto', description: 'Se dispara al crear un nuevo cliente o prospecto.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Teléfono', 'Fecha de Creación'] },
+      // New triggers from analysis
+      { name: 'Factura vencida sin pago', description: 'Se dispara cuando una factura vence y su estado es Enviada o Seguimiento.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta', 'Fecha de Vencimiento'] },
+      { name: 'Factura marcada Incobrable', description: 'Se dispara al clasificar una factura como incobrable.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta'] },
+      { name: 'Factura marcada como Abonada (Pago Parcial)', description: 'Se dispara al recibir un abono parcial en una factura.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Monto Abonado', 'Concepto de Venta'] },
+      { name: 'Ciclo de Factura Recurrente vencido', description: 'Se dispara antes de vencer el ciclo de una factura recurrente.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta'] },
+      { name: 'Cotización sin respuesta', description: 'Se dispara si una cotización no recibe respuesta tras N días.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta'] },
+      { name: 'Cotización Rechazada', description: 'Se dispara al rechazarse una cotización.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta'] },
+      { name: 'Cotización con probabilidad de cierre alta', description: 'Se dispara si la probabilidad de cierre supera el 80%.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta', 'Probabilidad'] },
+      { name: 'Prospecto convertido a Cliente (primer Invoice pagado)', description: 'Se dispara al pagarse la primera factura de un prospecto.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total'] },
+      { name: 'Cliente alcanza VIP', description: 'Se dispara si un cliente supera $5,000 o 10 documentos.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Total Facturado', 'Cantidad Documentos'] },
+      { name: 'Cliente sin actividad por X días', description: 'Se dispara si un cliente no registra actividad.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Días de Inactividad'] },
+      { name: 'Vencimiento fiscal próximo', description: 'Se dispara al aproximarse un vencimiento fiscal (DGI, Renta, SIPE, etc.).', outputs: ['Impuesto', 'Monto Estimado', 'Fecha Límite'] },
+      { name: 'Gasto registrado en categoría específica', description: 'Se dispara al registrar un gasto en categorías específicas.', outputs: ['Concepto de Gasto', 'Categoría', 'Monto Total'] }
     ],
     actions: [
       { name: 'Crear Factura o Cotización', description: 'POST /api/v1/invoices - Genera factura o cotización.', fields: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta'] },
-      { name: 'Actualizar Estado de Factura', description: 'PUT /api/v1/invoices - Cambia estado de factura.', fields: ['Nuevo Estado'] },
-      { name: 'Crear o Actualizar Cliente', description: 'POST /api/v1/clients - Registra un prospecto.', fields: ['Nombre del Cliente', 'Email del Cliente', 'Teléfono', 'Notas'] }
+      { name: 'Actualizar Estado de Factura', description: 'PUT /api/v1/invoices - Cambia estado de factura.', fields: ['ID de Factura', 'Nuevo Estado'] },
+      { name: 'Crear o Actualizar Cliente', description: 'POST /api/v1/clients - Registra un prospecto.', fields: ['Nombre del Cliente', 'Email del Cliente', 'Teléfono', 'Notas'] },
+      { name: 'Añadir etiqueta a un cliente', description: 'Segmenta clientes con etiquetas.', fields: ['Email del Cliente', 'Etiquetas'] },
+      { name: 'Añadir nota interna a un cliente', description: 'Registra una nota interna en la ficha del cliente.', fields: ['Email del Cliente', 'Notas'] },
+      { name: 'Enviar recordatorio de pago al cliente (vía email)', description: 'Envía correo de cobranza de factura vencida.', fields: ['ID de Factura'] }
     ]
   },
   process: {
