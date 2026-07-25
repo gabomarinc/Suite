@@ -31,7 +31,6 @@ export const ALL_APPS: Record<string, AppConfig> = {
       { name: 'Cotización con probabilidad de cierre alta', description: 'Se dispara si la probabilidad de cierre supera el 80%.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta', 'Probabilidad'] },
       { name: 'Prospecto convertido a Cliente (primer Invoice pagado)', description: 'Se dispara al pagarse la primera factura de un prospecto.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total'] },
       { name: 'Cliente alcanza VIP', description: 'Se dispara si un cliente supera $5,000 o 10 documentos.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Total Facturado', 'Cantidad Documentos'] },
-      { name: 'Cliente sin actividad por X días', description: 'Se dispara si un cliente no registra actividad.', outputs: ['Nombre del Cliente', 'Email del Cliente', 'Días de Inactividad'] },
       { name: 'Vencimiento fiscal próximo', description: 'Se dispara al aproximarse un vencimiento fiscal (DGI, Renta, SIPE, etc.).', outputs: ['Impuesto', 'Monto Estimado', 'Fecha Límite'] },
       { name: 'Gasto registrado en categoría específica', description: 'Se dispara al registrar un gasto en categorías específicas.', outputs: ['Concepto de Gasto', 'Categoría', 'Monto Total'] }
     ],

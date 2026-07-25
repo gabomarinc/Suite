@@ -643,7 +643,9 @@ export default function IntegrationCard({
                         fontSize: '0.85rem',
                         background: '#ffffff',
                         border: '1px solid #cbd5e1',
-                        borderRadius: '6px'
+                        borderRadius: '6px',
+                        width: '100%',
+                        minWidth: 0
                       }}
                     >
                       {currentAppConfig.triggers.map((trig, idx) => (
@@ -696,7 +698,9 @@ export default function IntegrationCard({
                             background: '#ffffff',
                             border: '1px solid #cbd5e1',
                             borderRadius: '6px',
-                            fontWeight: 600
+                            fontWeight: 600,
+                            width: '100%',
+                            minWidth: 0
                           }}
                         >
                           {activeConnectedTargetApps.map(i => (
@@ -712,7 +716,9 @@ export default function IntegrationCard({
                               background: '#f8fafc',
                               border: '1px solid #cbd5e1',
                               borderRadius: '6px',
-                              color: '#475569'
+                              color: '#475569',
+                              width: '100%',
+                              minWidth: 0
                             }}
                           >
                             <option>Ejecutar Plantilla de Proceso</option>
@@ -730,7 +736,9 @@ export default function IntegrationCard({
                               fontSize: '0.85rem',
                               background: '#ffffff',
                               border: '1px solid #cbd5e1',
-                              borderRadius: '6px'
+                              borderRadius: '6px',
+                              width: '100%',
+                              minWidth: 0
                             }}
                           >
                             {targetAppConfig.actions.map((act, idx) => (
