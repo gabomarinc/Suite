@@ -1,6 +1,7 @@
 import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
 import { LoginLink } from "@kinde-oss/kinde-auth-nextjs/components";
 import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
 
 export default async function DashboardHub() {
   const { isAuthenticated, getUser } = getKindeServerSession();
@@ -22,12 +23,13 @@ export default async function DashboardHub() {
   }
 
   const user = await getUser();
+  let dbUser = null;
 
   if (user && user.id) {
     try {
       const email = user.email || '';
       // 1. Try finding by Kinde ID
-      let dbUser = await prisma.user.findUnique({ where: { id: user.id } });
+      dbUser = await prisma.user.findUnique({ where: { id: user.id } });
       
       if (!dbUser && email) {
         // 2. Not found by Kinde ID, check if exists by email (legacy imported user)
@@ -44,7 +46,7 @@ export default async function DashboardHub() {
       }
 
       // 4. Upsert with the Kinde ID to ensure data is fresh
-      await prisma.user.upsert({
+      dbUser = await prisma.user.upsert({
         where: { id: user.id },
         update: {
           firstName: user.given_name,
@@ -60,6 +62,10 @@ export default async function DashboardHub() {
     } catch (e) {
       console.error("Failed to sync user to database:", e);
     }
+  }
+
+  if (!dbUser || !dbUser.plan || dbUser.plan === 'free') {
+    redirect('/pricing');
   }
 
   // Current Date logic

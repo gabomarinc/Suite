@@ -2,6 +2,7 @@ import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { updateUserProfile } from "./actions";
+import ManageSubscriptionButton from "./ManageSubscriptionButton";
 
 export default async function AjustesPage() {
   const { isAuthenticated, getUser } = getKindeServerSession();
@@ -151,9 +152,26 @@ export default async function AjustesPage() {
                 </div>
               )}
 
-              <p className="subscription-notice">
-                Para gestionar tus métodos de pago, facturas o cancelar tu plan actual, visita el portal de facturación en Kônsul Bills.
-              </p>
+              {dbUser.stripeCustomerId ? (
+                <ManageSubscriptionButton />
+              ) : (
+                <div style={{ marginTop: '1.25rem' }}>
+                  <a href="/pricing" className="btn-save-changes" style={{ 
+                    display: 'inline-flex', 
+                    width: '100%', 
+                    justifyContent: 'center', 
+                    textDecoration: 'none', 
+                    background: '#10b981', 
+                    color: '#ffffff',
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '0.85rem'
+                  }}>
+                    💎 Adquirir Plan Premium
+                  </a>
+                </div>
+              )}
             </div>
           </div>
           
