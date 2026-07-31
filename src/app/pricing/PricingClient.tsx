@@ -89,7 +89,7 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
             <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1.5rem 0' }}>Ideal para pequeños empresarios y profesionales independientes.</p>
             
             <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '2rem' }}>
-              <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#0f172a' }}>$19</span>
+              <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#0f172a' }}>$55</span>
               <span style={{ fontSize: '1rem', color: '#64748b', marginLeft: '0.25rem' }}>/mes</span>
             </div>
 
@@ -160,7 +160,7 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
             <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1.5rem 0' }}>Para empresas en crecimiento y flujos de automatización ilimitados.</p>
             
             <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '2rem' }}>
-              <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#0f172a' }}>$49</span>
+              <span style={{ fontSize: '2.5rem', fontWeight: 800, color: '#0f172a' }}>$95</span>
               <span style={{ fontSize: '1rem', color: '#64748b', marginLeft: '0.25rem' }}>/mes</span>
             </div>
 
