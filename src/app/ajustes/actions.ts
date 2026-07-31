@@ -10,12 +10,12 @@ export async function createPortalSession() {
   const isAuth = await isAuthenticated();
 
   if (!isAuth) {
-    throw new Error("No autenticado");
+    return { error: "No autenticado" };
   }
 
   const kindeUser = await getUser();
   if (!kindeUser || !kindeUser.id) {
-    throw new Error("Usuario no encontrado");
+    return { error: "Usuario no encontrado" };
   }
 
   const dbUser = await prisma.user.findUnique({
@@ -24,7 +24,7 @@ export async function createPortalSession() {
   });
 
   if (!dbUser || !dbUser.stripeCustomerId) {
-    throw new Error("No tienes una suscripción activa registrada en Stripe");
+    return { error: "No tienes una suscripción activa registrada en Stripe" };
   }
 
   const siteUrl = process.env.KINDE_SITE_URL || "https://suite.konsul.digital";
@@ -38,7 +38,7 @@ export async function createPortalSession() {
     return { url: portalSession.url };
   } catch (error: any) {
     console.error("Error creating portal session:", error);
-    throw new Error("Error al abrir el portal de Stripe");
+    return { error: "Error al abrir el portal de Stripe" };
   }
 }
 

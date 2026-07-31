@@ -9,12 +9,12 @@ export async function createCheckoutSession(priceId: string) {
   const isAuth = await isAuthenticated();
   
   if (!isAuth) {
-    throw new Error("Debe iniciar sesión para continuar");
+    return { error: "Debe iniciar sesión para continuar" };
   }
 
   const kindeUser = await getUser();
   if (!kindeUser || !kindeUser.id || !kindeUser.email) {
-    throw new Error("No se pudo obtener la información de su cuenta de Kinde");
+    return { error: "No se pudo obtener la información de su cuenta de Kinde" };
   }
 
   // Ensure user is synced to DB
@@ -56,12 +56,12 @@ export async function createCheckoutSession(priceId: string) {
     });
 
     if (!session.url) {
-      throw new Error("No se pudo generar la URL de Stripe Checkout");
+      return { error: "No se pudo generar la URL de Stripe Checkout" };
     }
 
     return { url: session.url };
   } catch (error: any) {
     console.error("Error creating checkout session:", error);
-    throw new Error(error.message || "Error al procesar el pago");
+    return { error: error.message || "Error al procesar el pago" };
   }
 }

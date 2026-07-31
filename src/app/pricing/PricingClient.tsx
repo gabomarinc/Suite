@@ -27,6 +27,9 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
 
     try {
       const result = await createCheckoutSession(priceId);
+      if (result.error) {
+        throw new Error(result.error);
+      }
       if (result.url) {
         window.location.href = result.url;
       } else {

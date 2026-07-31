@@ -12,6 +12,9 @@ export default function ManageSubscriptionButton() {
     setError(null);
     try {
       const result = await createPortalSession();
+      if (result.error) {
+        throw new Error(result.error);
+      }
       if (result.url) {
         window.location.href = result.url;
       }
