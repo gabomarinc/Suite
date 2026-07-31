@@ -1,45 +1,31 @@
 'use client';
 
 import { useState } from 'react';
-import { createCheckoutSession } from './actions';
 
 interface PricingClientProps {
   isAuthenticated: boolean;
   currentPlan: string;
 }
 
-const PLAN_BASIC_ID = "price_1TyDhcGAJ3j5QtJb91sVUk09";
-const PLAN_PRO_ID = "price_1TyDi1GAJ3j5QtJbNVlb59aE";
+const PLAN_BASIC_ID = "basic";
+const PLAN_PRO_ID = "pro";
 
 export default function PricingClient({ isAuthenticated, currentPlan }: PricingClientProps) {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSelectPlan = async (priceId: string, planName: string) => {
-    if (!isAuthenticated) {
-      // Redirect to Kinde Register
-      window.location.href = `/api/auth/register?post_login_redirect_url=${window.location.origin}/pricing`;
-      return;
-    }
-
+  const handleSelectPlan = (priceId: string, planName: string) => {
     setLoadingPlan(planName);
     setError(null);
 
-    try {
-      const result = await createCheckoutSession(priceId);
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      if (result.url) {
-        window.location.href = result.url;
-      } else {
-        throw new Error("No se pudo obtener la URL de pago");
-      }
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Ocurrió un error al iniciar el proceso de suscripción.");
-      setLoadingPlan(null);
+    if (!isAuthenticated) {
+      // Redirect to Kinde Register with plan_id
+      window.location.href = `/api/auth/register?plan_id=${priceId}&post_login_redirect_url=${window.location.origin}/pricing`;
+      return;
     }
+
+    // Redirect to Kinde Subscription page directly
+    window.location.href = `https://konsul.kinde.com/auth/cx/billing/subscribe?plan_id=${priceId}`;
   };
 
   const hasPaidPlan = currentPlan === 'basic' || currentPlan === 'pro';
