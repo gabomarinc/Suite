@@ -22,45 +22,56 @@ export async function POST(req: Request) {
 
     console.log(`ℹ️ Kinde Webhook event received: ${type}`, data);
 
-    if (type === 'billing.subscription.created' || type === 'billing.subscription.updated') {
-      const subscription = data?.subscription;
-      const userId = subscription?.user?.id;
-      const planKey = subscription?.plan?.key; // Expected to be "basic" or "pro"
-      const status = subscription?.status; // e.g. "active", "trialing"
+    if (type === 'customer.plan_assigned' || type === 'customer.plan_changed') {
+      const customerId = data?.customer?.id;
+      
+      const planId = data?.plan?.id?.toLowerCase();
+      const planCode = data?.plan?.code?.toLowerCase();
+      const planKey = data?.plan?.key?.toLowerCase();
+      const planName = data?.plan?.name?.toLowerCase();
 
-      if (userId && planKey) {
-        const isPlanActive = status === 'active' || status === 'trialing';
-        const finalPlan = isPlanActive ? planKey : 'free';
+      if (customerId) {
+        let finalPlan = 'free';
+        
+        if (
+          planId === 'pro' ||
+          planCode === 'pro' ||
+          planKey === 'pro' ||
+          planName?.includes('pro')
+        ) {
+          finalPlan = 'pro';
+        } else if (
+          planId === 'basic' ||
+          planCode === 'basic' ||
+          planKey === 'basic' ||
+          planName?.includes('basic')
+        ) {
+          finalPlan = 'basic';
+        }
 
         await prisma.user.upsert({
-          where: { id: userId },
+          where: { id: customerId },
           update: { 
-            plan: finalPlan,
-            stripeCustomerId: subscription?.stripe_customer_id || undefined,
-            stripeSubscriptionId: subscription?.id || undefined
+            plan: finalPlan
           },
           create: {
-            id: userId,
-            email: subscription?.user?.email || '',
+            id: customerId,
+            email: data?.customer?.email || '',
             firstName: '',
             lastName: '',
-            plan: finalPlan,
-            stripeCustomerId: subscription?.stripe_customer_id || undefined,
-            stripeSubscriptionId: subscription?.id || undefined
+            plan: finalPlan
           },
         });
-        console.log(`✅ Updated user ${userId} plan to ${finalPlan}`);
+        console.log(`✅ Updated user ${customerId} plan to ${finalPlan}`);
       }
-    } else if (type === 'billing.subscription.deleted') {
-      const subscription = data?.subscription;
-      const userId = subscription?.user?.id;
-
-      if (userId) {
+    } else if (type === 'customer.payment_failed') {
+      const customerId = data?.customer?.id;
+      if (customerId) {
         await prisma.user.update({
-          where: { id: userId },
+          where: { id: customerId },
           data: { plan: 'free' },
         });
-        console.log(`✅ Subscription deleted, reset user ${userId} plan to free`);
+        console.log(`✅ Payment failed, reset user ${customerId} plan to free`);
       }
     }
 
