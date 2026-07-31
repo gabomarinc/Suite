@@ -8,18 +8,7 @@ export default async function DashboardHub() {
   const isAuth = await isAuthenticated();
   
   if (!isAuth) {
-    return (
-      <main className="landing-wrapper">
-        <div className="landing-card">
-          <div className="landing-logo-wrapper">
-            <img src="https://konsul.digital/images/Konsul-logo-general.png" alt="Kônsul Logo" className="landing-logo" />
-          </div>
-          <h1>Kônsul Central Hub</h1>
-          <p>Tu panel unificado para acceder a todas las aplicaciones MicroSaaS de Kônsul. Inicia sesión una vez para acceder a todo.</p>
-          <LoginLink className="btn-primary-large">Iniciar Sesión con Kinde</LoginLink>
-        </div>
-      </main>
-    );
+    redirect('/pricing');
   }
 
   const user = await getUser();
