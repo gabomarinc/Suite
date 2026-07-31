@@ -15,7 +15,7 @@ function getPlanName(priceId: string): string {
 export async function POST(req: Request) {
   const body = await req.text();
   const signature = req.headers.get('stripe-signature') || '';
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
+  const webhookSecret = process.env.STRIPE_SECRET_KEY || '';
 
   let event: Stripe.Event;
 
