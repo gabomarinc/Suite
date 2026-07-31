@@ -1,17 +1,90 @@
 'use client';
 
-import { useState } from 'react';
-import { RegisterLink, PortalLink } from "@kinde-oss/kinde-auth-nextjs/components";
+import { useEffect, useState } from 'react';
 
 interface PricingClientProps {
   isAuthenticated: boolean;
   currentPlan: string;
 }
 
-const PLAN_BASIC_ID = "basic";
-const PLAN_PRO_ID = "pro";
-
 export default function PricingClient({ isAuthenticated, currentPlan }: PricingClientProps) {
+  const [basicPriceId, setBasicPriceId] = useState<string>('');
+  const [proPriceId, setProPriceId] = useState<string>('');
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load Price IDs from Stripe dynamically based on price amounts
+  useEffect(() => {
+    async function loadPrices() {
+      try {
+        const res = await fetch('/api/stripe-prices');
+        const data = await res.json();
+        if (data.prices && Array.isArray(data.prices)) {
+          const basic = data.prices.find((p: any) => p.amount === 55);
+          const pro = data.prices.find((p: any) => p.amount === 95);
+          if (basic) setBasicPriceId(basic.id);
+          if (pro) setProPriceId(pro.id);
+        }
+      } catch (err) {
+        console.error("Error loading prices dynamically:", err);
+      }
+    }
+    loadPrices();
+  }, []);
+
+  // Handle immediate checkout redirect if returning from registration
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const selectPlan = params.get('select_plan');
+    if (selectPlan && isAuthenticated && (basicPriceId || proPriceId)) {
+      // Clear URL params so it doesn't loop
+      window.history.replaceState({}, '', window.location.pathname);
+      
+      const planName = selectPlan === basicPriceId ? 'basic' : 'pro';
+      handleSelectPlan(selectPlan, planName);
+    }
+  }, [basicPriceId, proPriceId, isAuthenticated]);
+
+  const handleSelectPlan = async (priceId: string, planName: string) => {
+    if (!priceId) {
+      setError("No se pudo cargar el identificador de precio de Stripe. Por favor recarga e intenta de nuevo.");
+      return;
+    }
+
+    setLoadingPlan(planName);
+    setError(null);
+
+    if (!isAuthenticated) {
+      // If not logged in, redirect to Kinde registration and return here with selection
+      const redirectUrl = `${window.location.origin}/pricing?select_plan=${priceId}`;
+      window.location.href = `/api/auth/register?post_login_redirect_url=${encodeURIComponent(redirectUrl)}`;
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId }),
+      });
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("No se pudo generar la URL de Stripe Checkout");
+      }
+    } catch (err: any) {
+      console.error("Stripe checkout error:", err);
+      setError(err.message || "Ocurrió un error al iniciar la pasarela de pago.");
+      setLoadingPlan(null);
+    }
+  };
+
   const hasPaidPlan = currentPlan === 'basic' || currentPlan === 'pro';
 
   return (
@@ -30,6 +103,12 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
             Adquiere una de nuestras suscripciones premium para conectar tu facturación y automatizar tus procesos.
           </p>
         </div>
+
+        {error && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fecdd3', color: '#991b1b', padding: '1rem', borderRadius: '8px', marginBottom: '2rem', textAlign: 'center', fontSize: '0.9rem' }}>
+            ⚠️ {error}
+          </div>
+        )}
 
         {/* Pricing Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem', marginBottom: '3rem' }}>
@@ -60,71 +139,27 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
               <span style={{ fontSize: '1rem', color: '#64748b', marginLeft: '0.25rem' }}>/mes</span>
             </div>
 
-          <div style={{ marginBottom: '2rem' }}>
-            {!isAuthenticated ? (
-              <RegisterLink
-                authUrlParams={{ plan_id: PLAN_BASIC_ID }}
-                postLoginRedirectURL="/pricing"
-                style={{
-                  display: 'block',
-                  textAlign: 'center',
-                  width: '100%',
-                  padding: '0.85rem',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  textDecoration: 'none',
-                  cursor: 'pointer',
-                  background: '#0f172a',
-                  color: '#ffffff',
-                  border: 'none',
-                  transition: 'all 0.2s',
-                }}
-              >
-                Adquirir Plan Básico
-              </RegisterLink>
-            ) : currentPlan === 'basic' ? (
-              <button
-                disabled
-                style={{
-                  width: '100%',
-                  padding: '0.85rem',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  cursor: 'not-allowed',
-                  background: '#e2e8f0',
-                  color: '#64748b',
-                  border: 'none',
-                  transition: 'all 0.2s',
-                }}
-              >
-                Suscrito
-              </button>
-            ) : (
-              <PortalLink
-                style={{
-                  display: 'block',
-                  textAlign: 'center',
-                  width: '100%',
-                  padding: '0.85rem',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  textDecoration: 'none',
-                  cursor: 'pointer',
-                  background: '#0f172a',
-                  color: '#ffffff',
-                  border: 'none',
-                  transition: 'all 0.2s',
-                }}
-              >
-                Adquirir Plan Básico
-              </PortalLink>
-            )}
-          </div>
+            <button
+              onClick={() => handleSelectPlan(basicPriceId, "basic")}
+              disabled={loadingPlan !== null || currentPlan === 'basic'}
+              style={{
+                width: '100%',
+                padding: '0.85rem',
+                borderRadius: '8px',
+                fontSize: '0.9rem',
+                fontWeight: 700,
+                cursor: (loadingPlan !== null || currentPlan === 'basic') ? 'not-allowed' : 'pointer',
+                background: currentPlan === 'basic' ? '#e2e8f0' : '#0f172a',
+                color: currentPlan === 'basic' ? '#64748b' : '#ffffff',
+                border: 'none',
+                transition: 'all 0.2s',
+                marginBottom: '2rem'
+              }}
+            >
+              {loadingPlan === 'basic' ? 'Cargando pasarela...' : currentPlan === 'basic' ? 'Suscrito' : 'Adquirir Plan Básico'}
+            </button>
 
-          <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem', flexGrow: 1 }}>
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem', flexGrow: 1 }}>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
                   <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> Acceso completo a Kônsul Bills
@@ -175,72 +210,26 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
               <span style={{ fontSize: '1rem', color: '#64748b', marginLeft: '0.25rem' }}>/mes</span>
             </div>
 
-          <div style={{ marginBottom: '2rem' }}>
-            {!isAuthenticated ? (
-              <RegisterLink
-                authUrlParams={{ plan_id: PLAN_PRO_ID }}
-                postLoginRedirectURL="/pricing"
-                style={{
-                  display: 'block',
-                  textAlign: 'center',
-                  width: '100%',
-                  padding: '0.85rem',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  textDecoration: 'none',
-                  cursor: 'pointer',
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
-                }}
-              >
-                Adquirir Plan Pro
-              </RegisterLink>
-            ) : currentPlan === 'pro' ? (
-              <button
-                disabled
-                style={{
-                  width: '100%',
-                  padding: '0.85rem',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  cursor: 'not-allowed',
-                  background: '#e2e8f0',
-                  color: '#64748b',
-                  border: 'none',
-                  transition: 'all 0.2s',
-                  boxShadow: 'none',
-                }}
-              >
-                Suscrito
-              </button>
-            ) : (
-              <PortalLink
-                style={{
-                  display: 'block',
-                  textAlign: 'center',
-                  width: '100%',
-                  padding: '0.85rem',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  textDecoration: 'none',
-                  cursor: 'pointer',
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
-                }}
-              >
-                Adquirir Plan Pro
-              </PortalLink>
-            )}
-          </div>
+            <button
+              onClick={() => handleSelectPlan(proPriceId, "pro")}
+              disabled={loadingPlan !== null || currentPlan === 'pro'}
+              style={{
+                width: '100%',
+                padding: '0.85rem',
+                borderRadius: '8px',
+                fontSize: '0.9rem',
+                fontWeight: 700,
+                cursor: (loadingPlan !== null || currentPlan === 'pro') ? 'not-allowed' : 'pointer',
+                background: currentPlan === 'pro' ? '#e2e8f0' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                color: currentPlan === 'pro' ? '#64748b' : '#ffffff',
+                border: 'none',
+                transition: 'all 0.2s',
+                boxShadow: currentPlan === 'pro' ? 'none' : '0 4px 14px rgba(99, 102, 241, 0.4)',
+                marginBottom: '2rem'
+              }}
+            >
+              {loadingPlan === 'pro' ? 'Cargando pasarela...' : currentPlan === 'pro' ? 'Suscrito' : 'Adquirir Plan Pro'}
+            </button>
 
             <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem', flexGrow: 1 }}>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
