@@ -20,7 +20,7 @@ export default async function PricingPage() {
 
   return (
     <PricingClient 
-      isAuthenticated={isAuth} 
+      isAuthenticated={!!isAuth} 
       currentPlan={currentPlan}
     />
   );
