@@ -27,22 +27,33 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Price ID es requerido" }, { status: 400 });
     }
 
-    // Sync user in DB if they don't exist yet
-    let dbUser = await prisma.user.findUnique({
-      where: { id: kindeUser.id },
-    });
-
-    if (!dbUser) {
-      dbUser = await prisma.user.create({
-        data: {
-          id: kindeUser.id,
-          email: kindeUser.email,
-          firstName: kindeUser.given_name || "",
-          lastName: kindeUser.family_name || "",
-          plan: "free",
-        },
-      });
+    // Sync user in DB if they don't exist yet or need legacy pairing
+    let dbUser = await prisma.user.findUnique({ where: { id: kindeUser.id } });
+    
+    if (!dbUser && kindeUser.email) {
+      dbUser = await prisma.user.findUnique({ where: { email: kindeUser.email } });
+      if (dbUser) {
+        await prisma.user.update({
+          where: { email: kindeUser.email },
+          data: { id: kindeUser.id }
+        });
+      }
     }
+
+    dbUser = await prisma.user.upsert({
+      where: { id: kindeUser.id },
+      update: {
+        firstName: kindeUser.given_name || "",
+        lastName: kindeUser.family_name || "",
+      },
+      create: {
+        id: kindeUser.id,
+        email: kindeUser.email,
+        firstName: kindeUser.given_name || "",
+        lastName: kindeUser.family_name || "",
+        plan: "free",
+      }
+    });
 
     const siteUrl = process.env.KINDE_SITE_URL || 'https://suite.konsul.digital';
 
