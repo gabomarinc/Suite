@@ -18,6 +18,12 @@ function getPlanNameByPriceId(priceId: string | null): string {
   if (priceId === 'price_1TyDi1GAJ3j5QtJbNVlb59aE') {
     return 'pro';
   }
+  if (priceId === 'price_1TzyIYGAJ3j5QtJbEUFRIQjO') {
+    return 'basic_leads';
+  }
+  if (priceId === 'price_1TzacAGAJ3j5QtJbnhlCtAoz') {
+    return 'pro_leads';
+  }
   
   return 'free';
 }

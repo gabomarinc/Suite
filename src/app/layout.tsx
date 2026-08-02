@@ -26,7 +26,12 @@ export default async function RootLayout({
         where: { id: user.id },
         select: { plan: true }
       });
-      if (dbUser && (dbUser.plan === 'basic' || dbUser.plan === 'pro')) {
+      if (dbUser && (
+        dbUser.plan === 'basic' || 
+        dbUser.plan === 'pro' || 
+        dbUser.plan === 'basic_leads' || 
+        dbUser.plan === 'pro_leads'
+      )) {
         isLocked = false;
       }
     } catch (e) {
