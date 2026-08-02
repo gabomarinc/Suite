@@ -66,7 +66,7 @@ export default async function DashboardHub() {
           {/* Unique CTA Button */}
           <div>
             <RegisterLink 
-              postLoginRedirectUrl="/pricing"
+              postLoginRedirectURL="/pricing"
               style={{
                 display: 'inline-block',
                 background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
