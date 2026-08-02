@@ -8,24 +8,24 @@ interface PricingClientProps {
 }
 
 export default function PricingClient({ isAuthenticated, currentPlan }: PricingClientProps) {
-  const basicPriceId = 'price_1TyDhcGAJ3j5QtJb91sVUk09';
-  const proPriceId = 'price_1TyDi1GAJ3j5QtJbNVlb59aE';
-  
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const basicPriceId = 'price_1TyDhcGAJ3j5QtJb91sVUk09';
+  const proPriceId = 'price_1TyDi1GAJ3j5QtJbNVlb59aE';
 
   // Handle immediate checkout redirect if returning from registration
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const selectPlan = params.get('select_plan');
-    if (selectPlan && isAuthenticated && (basicPriceId || proPriceId)) {
+    if (selectPlan && isAuthenticated) {
       // Clear URL params so it doesn't loop
       window.history.replaceState({}, '', window.location.pathname);
       
       const planName = selectPlan === basicPriceId ? 'basic' : 'pro';
       handleSelectPlan(selectPlan, planName);
     }
-  }, [basicPriceId, proPriceId, isAuthenticated]);
+  }, [isAuthenticated]);
 
   const handleSelectPlan = async (priceId: string, planName: string) => {
     if (!priceId) {
