@@ -20,8 +20,9 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
         const res = await fetch('/api/stripe-prices');
         const data = await res.json();
         if (data.prices && Array.isArray(data.prices)) {
-          const basic = data.prices.find((p: any) => p.amount === 55);
-          const pro = data.prices.find((p: any) => p.amount === 95);
+          // Identificadores de Producto exactos proveídos por el usuario
+          const basic = data.prices.find((p: any) => p.productId === 'prod_UyA1b9Xgfi5yXT');
+          const pro = data.prices.find((p: any) => p.productId === 'prod_UyA2U5d95LHbQV');
           if (basic) setBasicPriceId(basic.id);
           if (pro) setProPriceId(pro.id);
         }

@@ -9,15 +9,13 @@ const stripe = new Stripe(stripeSecretKey, {
   apiVersion: '2024-06-20' as any,
 });
 
-function getPlanNameByAmount(amountCents: number | null): string {
-  if (!amountCents) return 'free';
+function getPlanNameByProductId(productId: string | null): string {
+  if (!productId) return 'free';
   
-  // Basic plan is $55.00
-  if (amountCents === 5500) {
+  if (productId === 'prod_UyA1b9Xgfi5yXT') {
     return 'basic';
   }
-  // Pro plan is $95.00
-  if (amountCents === 9500) {
+  if (productId === 'prod_UyA2U5d95LHbQV') {
     return 'pro';
   }
   
@@ -54,7 +52,8 @@ export async function POST(req: Request) {
         // Retrieve subscription to get price amount
         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
         const price = subscription.items.data[0].price;
-        const planName = getPlanNameByAmount(price.unit_amount);
+        const productId = typeof price.product === 'string' ? price.product : (price.product as any)?.id;
+        const planName = getPlanNameByProductId(productId);
 
         // Find user
         let user = null;
@@ -85,7 +84,8 @@ export async function POST(req: Request) {
         const subscription = event.data.object as Stripe.Subscription;
         const customerId = subscription.customer as string;
         const price = subscription.items.data[0].price;
-        const planName = getPlanNameByAmount(price.unit_amount);
+        const productId = typeof price.product === 'string' ? price.product : (price.product as any)?.id;
+        const planName = getPlanNameByProductId(productId);
         const status = subscription.status;
 
         // If subscription is canceled/unpaid, revert to free
