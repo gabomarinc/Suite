@@ -12,9 +12,10 @@ interface SidebarProps {
     email: string | null;
     picture: string | null;
   } | null;
+  isLocked?: boolean;
 }
 
-export default function Sidebar({ user }: SidebarProps) {
+export default function Sidebar({ user, isLocked = false }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
 
@@ -148,6 +149,33 @@ export default function Sidebar({ user }: SidebarProps) {
         {navItems.map((item) => {
           const isActive = pathname === item.href || (item.href === '/' && pathname === '/dashboard');
           
+          if (isLocked) {
+            return (
+              <div 
+                key={item.name} 
+                className="nav-item disabled"
+                style={{ 
+                  opacity: 0.5, 
+                  cursor: 'not-allowed', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: isCollapsed ? 'center' : 'space-between', 
+                  width: '100%',
+                  userSelect: 'none'
+                }}
+                title={isCollapsed ? `${item.name} (Adquiere un plan para desbloquear)` : "Adquiere un plan para desbloquear"}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: isCollapsed ? '0' : '12px' }}>
+                  <span className="nav-icon">{item.icon}</span>
+                  {!isCollapsed && <span className="nav-text">{item.name}</span>}
+                </div>
+                {!isCollapsed && (
+                  <span style={{ fontSize: '11px', opacity: 0.7 }}>🔒</span>
+                )}
+              </div>
+            );
+          }
+
           if (item.isExternal) {
             return (
               <a 

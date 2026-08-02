@@ -1,5 +1,5 @@
 import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
-import { LoginLink } from "@kinde-oss/kinde-auth-nextjs/components";
+import { RegisterLink } from "@kinde-oss/kinde-auth-nextjs/components";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
@@ -8,7 +8,88 @@ export default async function DashboardHub() {
   const isAuth = await isAuthenticated();
   
   if (!isAuth) {
-    redirect('/pricing');
+    // Render modern, clean Landing Page for unauthenticated users
+    return (
+      <main className="landing-wrapper" style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        padding: '2rem 1rem',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'
+      }}>
+        <div style={{ maxWidth: '800px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
+          {/* Logo */}
+          <div style={{ marginBottom: '2.5rem' }}>
+            <img src="https://konsul.digital/images/Konsul-logo-general.png" alt="Kônsul Logo" style={{ height: '60px', width: 'auto' }} />
+          </div>
+
+          {/* Tagline */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', padding: '0.4rem 1.2rem', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.5rem' }}>
+            Kônsul Suite Unificada
+          </div>
+
+          <h1 style={{ fontSize: '3rem', fontWeight: 800, color: '#0f172a', marginBottom: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+            La Suite de Herramientas Completa para Tu Negocio
+          </h1>
+          
+          <p style={{ fontSize: '1.2rem', color: '#475569', maxWidth: '600px', margin: '0 auto 3rem auto', lineHeight: 1.6 }}>
+            Accede a facturación electrónica inteligente, gestión de flujos de trabajo Kanban, captación de leads, análisis financiero de créditos y campañas de correo en una sola plataforma unificada.
+          </p>
+
+          {/* Suite Features Summary List */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '1.5rem', 
+            marginBottom: '3rem',
+            textAlign: 'left'
+          }}>
+            <div style={{ background: '#ffffff', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+              <div style={{ color: '#10b981', fontSize: '1.5rem', marginBottom: '0.5rem' }}>💼</div>
+              <h4 style={{ fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem' }}>Kônsul Bills</h4>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>Facturas, gastos y reportes fiscales automáticos.</p>
+            </div>
+            <div style={{ background: '#ffffff', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+              <div style={{ color: '#6366f1', fontSize: '1.5rem', marginBottom: '0.5rem' }}>⚡</div>
+              <h4 style={{ fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem' }}>Kônsul Process</h4>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>Workflows, tableros Kanban y automatizaciones.</p>
+            </div>
+            <div style={{ background: '#ffffff', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+              <div style={{ color: '#f59e0b', fontSize: '1.5rem', marginBottom: '0.5rem' }}>🎯</div>
+              <h4 style={{ fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem' }}>Kônsul Marketing</h4>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>Emailing, leads y campañas automáticas.</p>
+            </div>
+          </div>
+
+          {/* Unique CTA Button */}
+          <div>
+            <RegisterLink 
+              postLoginRedirectUrl="/pricing"
+              style={{
+                display: 'inline-block',
+                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                color: '#ffffff',
+                padding: '1rem 2.5rem',
+                borderRadius: '8px',
+                fontSize: '1.1rem',
+                fontWeight: 700,
+                textDecoration: 'none',
+                boxShadow: '0 10px 15px -3px rgba(99, 102, 241, 0.3)',
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                cursor: 'pointer'
+              }}
+            >
+              Comenzar Registro Gratis →
+            </RegisterLink>
+            <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '1rem' }}>
+              ¿Ya tienes cuenta? <a href="/api/auth/login?post_login_redirect_url=/" style={{ color: '#4f46e5', fontWeight: 700, textDecoration: 'none' }}>Inicia sesión aquí</a>
+            </p>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   const user = await getUser();
@@ -26,7 +107,6 @@ export default async function DashboardHub() {
         
         if (dbUser) {
           // 3. Pair legacy user: Update their ID from temp to Kinde ID
-          // In Postgres we can update the primary key if there are no strict foreign key conflicts
           await prisma.user.update({
             where: { email },
             data: { id: user.id }

@@ -94,14 +94,14 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
         
         {/* Top Header */}
         <div style={{ textTransform: 'none', textAlign: 'center', marginBottom: '3rem' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '0.4rem 1rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
-            Planes Kônsul Suite
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', padding: '0.4rem 1.2rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
+            🔒 Paso Obligatorio: Selecciona tu suscripción
           </div>
           <h1 style={{ fontSize: '2.5rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>
-            Desbloquea el potencial de tu negocio
+            Estás a un paso de desbloquear todo el potencial de tu negocio
           </h1>
           <p style={{ fontSize: '1.1rem', color: '#64748b', maxWidth: '600px', margin: '0 auto' }}>
-            Adquiere una de nuestras suscripciones premium para conectar tu facturación y automatizar tus procesos.
+            Elige uno de nuestros planes premium para activar la Suite y desbloquear todas las herramientas y el menú de navegación.
           </p>
         </div>
 
