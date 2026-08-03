@@ -33,7 +33,9 @@ model User {
   updatedAt            DateTime        @updatedAt
   
   // Control de consumo mensual
-  aiUsage              Int             @default(0)
+  aiUsageBills         Int             @default(0)
+  aiUsageProcess       Int             @default(0)
+  aiUsageMailing       Int             @default(0)
   emailUsage           Int             @default(0)
   limitsResetDate      DateTime        @default(now())
   

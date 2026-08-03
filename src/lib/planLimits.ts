@@ -1,66 +1,86 @@
 import { prisma } from './prisma';
 
-export interface PlanLimits {
-  kanbanBoards: number;
-  automationRules: number;
+export interface AppMailingLimits {
+  emailsPerMonth: number;
+  contacts: number;
   aiRequests: number;
-  emails: number;
-  leadsHubAccess: boolean;
-  leadsHubContacts: number;
-  supportLevel: 'standard' | 'priority';
-  reportsAdvanced: boolean;
+}
+
+export interface AppProcessLimits {
+  activeExecutions: number;
+  aiRequests: number;
+}
+
+export interface AppBillsLimits {
+  aiRequests: number;
+  digitalPayments: boolean;
+  customSmtp: boolean;
+}
+
+export interface AppKreditLimits {
+  contacts: number;
+  properties: number;
+}
+
+export interface AppReactivaLeadsLimits {
+  contacts: number;
+  campaigns: number;
+}
+
+export interface AppLeadsHubLimits {
+  access: boolean;
+  contacts: number;
+}
+
+export interface PlanLimits {
+  mailing: AppMailingLimits;
+  process: AppProcessLimits;
+  bills: AppBillsLimits;
+  kredit: AppKreditLimits;
+  reactivaLeads: AppReactivaLeadsLimits;
+  leadsHub: AppLeadsHubLimits;
 }
 
 export const PLAN_LIMITS: Record<string, PlanLimits> = {
   free: {
-    kanbanBoards: 1,
-    automationRules: 1,
-    aiRequests: 5,
-    emails: 10,
-    leadsHubAccess: false,
-    leadsHubContacts: 0,
-    supportLevel: 'standard',
-    reportsAdvanced: false,
+    mailing: { emailsPerMonth: 10, contacts: 50, aiRequests: 0 },
+    process: { activeExecutions: 1, aiRequests: 0 },
+    bills: { aiRequests: 0, digitalPayments: false, customSmtp: false },
+    kredit: { contacts: 10, properties: 1 },
+    reactivaLeads: { contacts: 50, campaigns: 1 },
+    leadsHub: { access: false, contacts: 0 },
   },
   basic: {
-    kanbanBoards: 3,
-    automationRules: 5,
-    aiRequests: 100,
-    emails: 500,
-    leadsHubAccess: false,
-    leadsHubContacts: 0,
-    supportLevel: 'standard',
-    reportsAdvanced: false,
+    mailing: { emailsPerMonth: 25000, contacts: 2000, aiRequests: 25 },
+    process: { activeExecutions: 20, aiRequests: 100 },
+    bills: { aiRequests: 100, digitalPayments: false, customSmtp: false },
+    kredit: { contacts: 500, properties: 10 },
+    reactivaLeads: { contacts: 2000, campaigns: 2 },
+    leadsHub: { access: false, contacts: 0 },
   },
   pro: {
-    kanbanBoards: 99999, // ilimitado
-    automationRules: 99999, // ilimitado
-    aiRequests: 1000, // fair use
-    emails: 5000, // fair use
-    leadsHubAccess: false,
-    leadsHubContacts: 0,
-    supportLevel: 'priority',
-    reportsAdvanced: true,
+    mailing: { emailsPerMonth: 100000, contacts: 20000, aiRequests: 100 },
+    process: { activeExecutions: 999999, aiRequests: 1000 }, // 999999 is unlimited
+    bills: { aiRequests: 1000, digitalPayments: true, customSmtp: true },
+    kredit: { contacts: 999999, properties: 999999 },
+    reactivaLeads: { contacts: 999999, campaigns: 999999 },
+    leadsHub: { access: false, contacts: 0 },
   },
   basic_leads: {
-    kanbanBoards: 3,
-    automationRules: 5,
-    aiRequests: 100,
-    emails: 500,
-    leadsHubAccess: true,
-    leadsHubContacts: 1000,
-    supportLevel: 'standard',
-    reportsAdvanced: false,
+    mailing: { emailsPerMonth: 25000, contacts: 2000, aiRequests: 25 },
+    process: { activeExecutions: 20, aiRequests: 100 },
+    bills: { aiRequests: 100, digitalPayments: false, customSmtp: false },
+    kredit: { contacts: 500, properties: 10 },
+    reactivaLeads: { contacts: 2000, campaigns: 2 },
+    leadsHub: { access: true, contacts: 1000 },
   },
   pro_leads: {
-    kanbanBoards: 99999, // ilimitado
-    automationRules: 99999, // ilimitado
-    aiRequests: 1000, // fair use
-    emails: 5000, // fair use
-    leadsHubAccess: true,
-    leadsHubContacts: 99999, // ilimitado
-    supportLevel: 'priority',
-    reportsAdvanced: true,
+    mailing: { emailsPerMonth: 100000, contacts: 20000, aiRequests: 100 },
+    process: { activeExecutions: 999999, aiRequests: 1000 },
+    bills: { aiRequests: 1000, digitalPayments: true, customSmtp: true },
+    kredit: { contacts: 999999, properties: 999999 },
+    reactivaLeads: { contacts: 999999, campaigns: 999999 },
+    leadsHub: { access: true, contacts: 999999 },
   },
 };
 
@@ -75,7 +95,9 @@ export function getLimitsForPlan(plan: string | null | undefined): PlanLimits {
  */
 export async function getOrResetUserUsage(user: {
   id: string;
-  aiUsage: number;
+  aiUsageBills: number;
+  aiUsageProcess: number;
+  aiUsageMailing: number;
   emailUsage: number;
   limitsResetDate: Date;
 }) {
@@ -91,25 +113,33 @@ export async function getOrResetUserUsage(user: {
     const updatedUser = await prisma.user.update({
       where: { id: user.id },
       data: {
-        aiUsage: 0,
+        aiUsageBills: 0,
+        aiUsageProcess: 0,
+        aiUsageMailing: 0,
         emailUsage: 0,
         limitsResetDate: now,
       },
       select: {
-        aiUsage: true,
+        aiUsageBills: true,
+        aiUsageProcess: true,
+        aiUsageMailing: true,
         emailUsage: true,
         limitsResetDate: true,
       }
     });
     return {
-      aiUsage: updatedUser.aiUsage,
+      aiUsageBills: updatedUser.aiUsageBills,
+      aiUsageProcess: updatedUser.aiUsageProcess,
+      aiUsageMailing: updatedUser.aiUsageMailing,
       emailUsage: updatedUser.emailUsage,
       limitsResetDate: updatedUser.limitsResetDate,
     };
   }
   
   return {
-    aiUsage: user.aiUsage,
+    aiUsageBills: user.aiUsageBills,
+    aiUsageProcess: user.aiUsageProcess,
+    aiUsageMailing: user.aiUsageMailing,
     emailUsage: user.emailUsage,
     limitsResetDate: user.limitsResetDate,
   };

@@ -36,7 +36,9 @@ export async function GET(req: Request) {
         plan: 'free',
         limits: freeLimits,
         usage: {
-          aiUsage: 0,
+          aiUsageBills: 0,
+          aiUsageProcess: 0,
+          aiUsageMailing: 0,
           emailUsage: 0,
           limitsResetDate: new Date()
         }
@@ -46,7 +48,9 @@ export async function GET(req: Request) {
     // 5. Check and handle monthly limits reset
     const usage = await getOrResetUserUsage({
       id: user.id,
-      aiUsage: user.aiUsage,
+      aiUsageBills: user.aiUsageBills,
+      aiUsageProcess: user.aiUsageProcess,
+      aiUsageMailing: user.aiUsageMailing,
       emailUsage: user.emailUsage,
       limitsResetDate: user.limitsResetDate,
     });

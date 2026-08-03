@@ -19,8 +19,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing userId or email identifier' }, { status: 400 });
     }
 
-    if (!resource || !['ai', 'email'].includes(resource)) {
-      return NextResponse.json({ error: 'Invalid or missing resource type (must be "ai" or "email")' }, { status: 400 });
+    if (!resource || !['ai_bills', 'ai_process', 'ai_mailing', 'email'].includes(resource)) {
+      return NextResponse.json({ error: 'Invalid or missing resource type (must be "ai_bills", "ai_process", "ai_mailing" or "email")' }, { status: 400 });
     }
 
     // 3. Find user
@@ -37,8 +37,12 @@ export async function POST(req: Request) {
 
     // 4. Determine update field
     const updateData: Record<string, any> = {};
-    if (resource === 'ai') {
-      updateData.aiUsage = { increment };
+    if (resource === 'ai_bills') {
+      updateData.aiUsageBills = { increment };
+    } else if (resource === 'ai_process') {
+      updateData.aiUsageProcess = { increment };
+    } else if (resource === 'ai_mailing') {
+      updateData.aiUsageMailing = { increment };
     } else if (resource === 'email') {
       updateData.emailUsage = { increment };
     }
@@ -51,7 +55,9 @@ export async function POST(req: Request) {
         id: true,
         email: true,
         plan: true,
-        aiUsage: true,
+        aiUsageBills: true,
+        aiUsageProcess: true,
+        aiUsageMailing: true,
         emailUsage: true,
       }
     });
@@ -62,7 +68,9 @@ export async function POST(req: Request) {
         id: updatedUser.id,
         email: updatedUser.email,
         plan: updatedUser.plan,
-        aiUsage: updatedUser.aiUsage,
+        aiUsageBills: updatedUser.aiUsageBills,
+        aiUsageProcess: updatedUser.aiUsageProcess,
+        aiUsageMailing: updatedUser.aiUsageMailing,
         emailUsage: updatedUser.emailUsage,
       }
     });
