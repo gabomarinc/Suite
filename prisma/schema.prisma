@@ -32,6 +32,11 @@ model User {
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   
+  // Control de consumo mensual
+  aiUsage              Int             @default(0)
+  emailUsage           Int             @default(0)
+  limitsResetDate      DateTime        @default(now())
+  
   apps                 UserAppAccess[]
   integrations         Integration[]
   automationRules      AutomationRule[]
