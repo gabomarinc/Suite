@@ -314,43 +314,6 @@ export default async function DashboardHub() {
             </div>
           </div>
         </a>
-
-        {/* LeadsHUB Card */}
-        <a 
-          href={hasLeadsHub ? "https://leadshub.konsul.digital/" : "/pricing"} 
-          className={`card card-leadshub ${!hasLeadsHub ? 'card-locked' : ''}`}
-        >
-          <div className="card-header-suite">
-            <div className="card-suite-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
-                <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
-                <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>
-                <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
-              </svg>
-            </div>
-            <span className="card-badge-status">
-              {hasLeadsHub ? 'Activo' : 'Upgrade Req.'}
-            </span>
-          </div>
-          <div className="card-body">
-            <h3>Kônsul LeadsHUB</h3>
-            <p>Plataforma premium de prospección automática, captación multicanal masiva y seguimiento de leads con IA.</p>
-          </div>
-          <div className="card-footer-suite">
-            <div className="quick-links">
-              <span className="quick-link-btn">Leads</span>
-              <span className="quick-link-btn">Campañas</span>
-            </div>
-            <div className="arrow-suite-btn">
-              {hasLeadsHub ? (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-              ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-              )}
-            </div>
-          </div>
-        </a>
       </div>
     </main>
   );
