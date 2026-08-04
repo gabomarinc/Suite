@@ -22,7 +22,7 @@ export default async function DashboardHub() {
         <div style={{ maxWidth: '800px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
           {/* Logo */}
           <div style={{ marginBottom: '2.5rem' }}>
-            <img src="https://konsul.digital/images/Konsul-logo-general.png" alt="Kônsul Logo" style={{ height: '60px', width: 'auto' }} />
+            <img src="https://konsul.digital/images/Konsul-logo-general.png" alt="Kônsul Logo" style={{ height: '80px', width: 'auto' }} />
           </div>
 
           {/* Tagline */}
