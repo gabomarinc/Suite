@@ -218,19 +218,22 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
                 <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem', flexGrow: 1 }}>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> Acceso completo a Kônsul Bills
+                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> <b>Apps Incluidas:</b> Bills, Process, Mailing, Kredit, Reactivaleads <i>(LeadsHUB no incluido)</i>
                     </li>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> Acceso completo a Kônsul Process
+                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> <b>Mailing:</b> 25k envíos/mes, 2k contactos, 25 tokens IA
                     </li>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> Hasta 3 Tableros Kanban de procesos
+                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> <b>Process:</b> 20 ejecuciones activas, 100 tokens IA
                     </li>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> Reportes financieros y fiscales estándar
+                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> <b>Bills:</b> Reportes financieros y 100 tokens IA
                     </li>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> Límites estándar de consumo de IA y SES
+                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> <b>Kredit:</b> 500 contactos, 10 propiedades
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
+                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> <b>Reactivaleads:</b> 2k contactos, 2 campañas
                     </li>
                   </ul>
                 </div>
@@ -287,19 +290,22 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
                 <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem', flexGrow: 1 }}>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> **Ilimitado** en Bills y Process
+                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> <b>Apps Incluidas:</b> Bills, Process, Mailing, Kredit, Reactivaleads <i>(LeadsHUB no incluido)</i>
                     </li>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> Tableros Kanban ilimitados
+                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> <b>Mailing:</b> 100k envíos/mes, 20k contactos, 100 tokens IA
                     </li>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> Automatizaciones de flujo cruzado ilimitadas
+                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> <b>Process:</b> Ejecuciones Ilimitadas, 1000 tokens IA
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
+                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> <b>Bills:</b> Pagos digitales, SMTP propio, 1000 tokens IA
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
+                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> <b>Kredit y Reactivaleads:</b> Todo Ilimitado
                     </li>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
                       <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> Soporte prioritario 24/7
-                    </li>
-                    <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> Acceso ilimitado *( fair use en IA/SES )*
                     </li>
                   </ul>
                 </div>
@@ -354,16 +360,19 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
                 <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem', flexGrow: 1 }}>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> **Suite**: Límites del Plan Básico
+                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> <b>Apps Incluidas:</b> Todas las de la Suite + <b>LeadsHUB</b>
                     </li>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> **LeadsHUB**: Acceso y gestión de campañas
+                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> <b>LeadsHUB:</b> Acceso completo, hasta 1,000 contactos
                     </li>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> Hasta 1,000 contactos en LeadsHUB
+                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> <b>Mailing:</b> 25k envíos/mes, 2k contactos
                     </li>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> Integración estándar de leads y webhooks
+                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> <b>Process:</b> 20 ejecuciones, <b>Bills:</b> Reportes
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
+                      <span style={{ color: '#10b981', fontWeight: 700 }}>✓</span> <b>Kredit:</b> 500 contactos, 10 propiedades
                     </li>
                   </ul>
                 </div>
@@ -420,16 +429,19 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
                 <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem', flexGrow: 1 }}>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> **Suite**: Límites del Plan Pro (Ilimitado)
+                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> <b>Apps Incluidas:</b> Todas las de la Suite + <b>LeadsHUB</b>
                     </li>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> **LeadsHUB**: Contactos y leads **Ilimitados**
+                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> <b>LeadsHUB:</b> Contactos y leads Ilimitados
                     </li>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> Flujos y Webhooks ilimitados
+                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> <b>Mailing:</b> 100k envíos, 20k contactos, 100 IA
                     </li>
                     <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> Sin costos extra ocultos *(excluye envíos directos SES/IA)*
+                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> <b>Process:</b> Ejecuciones Ilimitadas, 1000 IA
+                    </li>
+                    <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
+                      <span style={{ color: '#6366f1', fontWeight: 700 }}>✓</span> <b>Bills y Kredit:</b> Funciones Pro Ilimitadas
                     </li>
                   </ul>
                 </div>
