@@ -69,8 +69,27 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
       }
     } catch (err: any) {
       console.error("Stripe checkout error:", err);
-      setError(err.message || "Ocurrió un error al iniciar la pasarela de pago.");
       setLoadingPlan(null);
+    }
+  };
+
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/stripe/sync', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        window.location.href = '/';
+      } else {
+        setError(data.message || 'No se encontró una suscripción activa en Stripe.');
+      }
+    } catch (err: any) {
+      setError('Error al intentar sincronizar la suscripción.');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -460,9 +479,31 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
               ← Volver al Dashboard Principal
             </a>
           ) : isAuthenticated ? (
-            <p style={{ fontSize: '0.85rem', color: '#64748b' }}>
-              ¿Ya has adquirido un plan y no se visualiza? Recarga la página o contacta con soporte.
-            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+              <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+                ¿Ya has adquirido un plan y no se visualiza?
+              </p>
+              <button
+                onClick={handleSync}
+                disabled={syncing}
+                style={{
+                  background: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  color: '#475569',
+                  padding: '0.5rem 1.25rem',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: syncing ? 'wait' : 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                {syncing ? 'Verificando con Stripe...' : '🔄 Sincronizar / Verificar suscripción'}
+              </button>
+            </div>
           ) : (
             <p style={{ fontSize: '0.85rem', color: '#64748b' }}>
               ¿Ya tienes cuenta? <a href="/api/auth/login" style={{ color: '#4f46e5', fontWeight: 700, textDecoration: 'none' }}>Inicia sesión aquí</a>

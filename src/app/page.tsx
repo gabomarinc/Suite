@@ -2,6 +2,7 @@ import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
 import { RegisterLink } from "@kinde-oss/kinde-auth-nextjs/components";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { syncUserPlanFromStripe } from "@/lib/stripeSync";
 
 export default async function DashboardHub() {
   const { isAuthenticated, getUser } = getKindeServerSession();
@@ -163,6 +164,14 @@ export default async function DashboardHub() {
           lastName: user.family_name,
         }
       });
+
+      // 5. If user plan is free, attempt self-healing sync with Stripe directly
+      if (!dbUser.plan || dbUser.plan === 'free') {
+        const syncedUser = await syncUserPlanFromStripe({ id: user.id, email });
+        if (syncedUser) {
+          dbUser = syncedUser;
+        }
+      }
     } catch (e) {
       console.error("Failed to sync user to database:", e);
     }
