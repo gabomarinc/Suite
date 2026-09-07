@@ -4,6 +4,7 @@ import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
 import { LogoutLink } from "@kinde-oss/kinde-auth-nextjs/components";
 import Sidebar from "@/components/Sidebar";
 import { prisma } from "@/lib/prisma";
+import { syncUserPlanFromStripe } from "@/lib/stripeSync";
 
 export const metadata: Metadata = {
   title: "Konsul Central Hub",
@@ -22,17 +23,32 @@ export default async function RootLayout({
   let isLocked = true;
   if (isAuth && user?.id) {
     try {
-      const dbUser = await prisma.user.findUnique({
+      let dbUser = await prisma.user.findUnique({
         where: { id: user.id },
-        select: { plan: true }
+        select: { plan: true, role: true, email: true }
       });
-      if (dbUser && (
-        dbUser.plan === 'basic' || 
-        dbUser.plan === 'pro' || 
-        dbUser.plan === 'basic_leads' || 
-        dbUser.plan === 'pro_leads'
-      )) {
+
+      const email = user.email || dbUser?.email || '';
+      const isAdmin = dbUser?.role === 'ADMIN' || email === 'somos@konsul.digital' || email.endsWith('@konsul.digital');
+
+      if (isAdmin) {
         isLocked = false;
+      } else {
+        if (!dbUser || !dbUser.plan || dbUser.plan === 'free') {
+          const syncedUser = await syncUserPlanFromStripe({ id: user.id, email: user.email });
+          if (syncedUser) {
+            dbUser = { plan: syncedUser.plan, role: syncedUser.role, email: syncedUser.email };
+          }
+        }
+
+        if (dbUser && (
+          dbUser.plan === 'basic' || 
+          dbUser.plan === 'pro' || 
+          dbUser.plan === 'basic_leads' || 
+          dbUser.plan === 'pro_leads'
+        )) {
+          isLocked = false;
+        }
       }
     } catch (e) {
       console.error("Failed to fetch user plan in layout:", e);

@@ -22,7 +22,7 @@ export function getPlanNameByPriceId(priceId: string | null | undefined): string
 
 /**
  * Self-healing helper: Checks Stripe directly for any active/trialing subscription 
- * associated with the user's email if their DB record shows plan === 'free'.
+ * associated with the user's email, handles ADMIN accounts automatically, and syncs Postgres DB.
  */
 export async function syncUserPlanFromStripe(kindeUser: { id: string; email?: string | null }) {
   if (!kindeUser || (!kindeUser.id && !kindeUser.email)) {
@@ -30,14 +30,15 @@ export async function syncUserPlanFromStripe(kindeUser: { id: string; email?: st
   }
 
   try {
-    const email = kindeUser.email || '';
+    const email = (kindeUser.email || '').toLowerCase().trim();
+    const isAdminEmail = email === 'somos@konsul.digital' || email.endsWith('@konsul.digital');
 
-    // 1. Fetch user from DB
+    // 1. Fetch user from DB by ID or Email
     let dbUser = await prisma.user.findUnique({ where: { id: kindeUser.id } });
     if (!dbUser && email) {
       dbUser = await prisma.user.findUnique({ where: { email } });
       if (dbUser) {
-        // Link legacy user ID to Kinde ID if needed
+        // Link legacy user ID to Kinde ID
         dbUser = await prisma.user.update({
           where: { email },
           data: { id: kindeUser.id },
@@ -49,12 +50,27 @@ export async function syncUserPlanFromStripe(kindeUser: { id: string; email?: st
       return null;
     }
 
-    // If user already has a valid paid plan in DB, no need to query Stripe
+    // 2. ADMIN account check: ADMINs automatically get 'pro_leads' plan and 'ADMIN' role
+    if (isAdminEmail || dbUser.role === 'ADMIN') {
+      if (dbUser.plan !== 'pro_leads' || dbUser.role !== 'ADMIN') {
+        dbUser = await prisma.user.update({
+          where: { id: dbUser.id },
+          data: {
+            plan: 'pro_leads',
+            role: 'ADMIN',
+          },
+        });
+        console.log(`[StripeSync] Auto-assigned ADMIN pro_leads access to ${email}`);
+      }
+      return dbUser;
+    }
+
+    // If user already has a valid paid plan in DB, return it
     if (dbUser.plan && dbUser.plan !== 'free') {
       return dbUser;
     }
 
-    // 2. Query Stripe directly by email
+    // 3. Query Stripe directly by email
     if (!email) return dbUser;
 
     const customers = await stripe.customers.list({
@@ -66,7 +82,7 @@ export async function syncUserPlanFromStripe(kindeUser: { id: string; email?: st
       return dbUser;
     }
 
-    // 3. Find any active or trialing subscription across matching customers
+    // 4. Find any active or trialing subscription across matching customers
     for (const customer of customers.data) {
       const subscriptions = await stripe.subscriptions.list({
         customer: customer.id,
@@ -75,15 +91,15 @@ export async function syncUserPlanFromStripe(kindeUser: { id: string; email?: st
       });
 
       const activeSub = subscriptions.data.find(
-        (sub: Stripe.Subscription) => sub.status === 'active' || sub.status === 'trialing'
+        (sub) => sub.status === 'active' || sub.status === 'trialing'
       );
 
       if (activeSub) {
         const priceId = activeSub.items.data[0]?.price?.id;
         let planName = getPlanNameByPriceId(priceId);
 
-        // Fallback: If Price ID is unmapped (e.g., custom trial price, coupon, new price ID),
-        // inspect nickname/metadata or fallback to 'basic' / 'basic_leads' so user isn't blocked!
+        // Fallback for coupons ($0 subscription), custom prices, or unmapped Price IDs:
+        // If Stripe shows an active/trialing subscription, NEVER downgrade to 'free'!
         if (planName === 'free') {
           const priceObj = activeSub.items.data[0]?.price;
           const nickname = (priceObj?.nickname || '').toLowerCase();
@@ -95,7 +111,7 @@ export async function syncUserPlanFromStripe(kindeUser: { id: string; email?: st
           } else if (nickname.includes('lead') || nickname.includes('hub')) {
             planName = 'basic_leads';
           } else {
-            planName = 'basic';
+            planName = 'pro_leads'; // Default to full access for active Stripe subscribers with custom/coupon price
           }
         }
 

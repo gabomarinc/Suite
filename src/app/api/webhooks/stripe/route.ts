@@ -100,14 +100,17 @@ export async function POST(req: Request) {
         });
 
         if (user) {
+          const isAdmin = user.role === 'ADMIN' || user.email === 'somos@konsul.digital' || user.email.endsWith('@konsul.digital');
+          const finalPlan = isAdmin ? 'pro_leads' : activePlan;
+
           await prisma.user.update({
             where: { id: user.id },
             data: {
-              plan: activePlan,
+              plan: finalPlan,
               stripeSubscriptionId: subscription.id,
             },
           });
-          console.log(`✅ Subscription updated for customer ${customerId} to plan: ${activePlan}`);
+          console.log(`✅ Subscription updated for customer ${customerId} to plan: ${finalPlan}`);
         }
         break;
       }
@@ -121,14 +124,17 @@ export async function POST(req: Request) {
         });
 
         if (user) {
+          const isAdmin = user.role === 'ADMIN' || user.email === 'somos@konsul.digital' || user.email.endsWith('@konsul.digital');
+          const finalPlan = isAdmin ? 'pro_leads' : 'free';
+
           await prisma.user.update({
             where: { id: user.id },
             data: {
-              plan: 'free',
+              plan: finalPlan,
               stripeSubscriptionId: null,
             },
           });
-          console.log(`✅ Subscription deleted/reverted to free for customer ${customerId}`);
+          console.log(`✅ Subscription deleted/reverted for customer ${customerId} to plan: ${finalPlan}`);
         }
         break;
       }

@@ -1,6 +1,7 @@
 import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { syncUserPlanFromStripe } from "@/lib/stripeSync";
 
 export default async function AutomatizacionesLayout({
   children,
@@ -19,10 +20,20 @@ export default async function AutomatizacionesLayout({
     redirect("/api/auth/login");
   }
 
-  const dbUser = await prisma.user.findUnique({
+  let dbUser = await prisma.user.findUnique({
     where: { id: kindeUser.id },
-    select: { plan: true }
+    select: { plan: true, role: true }
   });
+
+  if (!dbUser || !dbUser.plan || dbUser.plan === 'free') {
+    const syncedUser = await syncUserPlanFromStripe({
+      id: kindeUser.id,
+      email: kindeUser.email,
+    });
+    if (syncedUser) {
+      dbUser = { plan: syncedUser.plan, role: syncedUser.role };
+    }
+  }
 
   if (!dbUser || !dbUser.plan || dbUser.plan === 'free') {
     redirect('/pricing');
