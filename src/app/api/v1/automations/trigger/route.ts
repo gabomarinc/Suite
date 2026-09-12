@@ -325,6 +325,99 @@ export async function POST(req: Request) {
             }
           });
           executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });
+      } else if (targetApp === 'mailing') {
+        const actionConfig = ALL_APPS.mailing.actions[rule.actionIdx];
+        const actionName = actionConfig?.name || 'Acción en Mailing';
+        const mailingUrl = process.env.NEXT_PUBLIC_MAILING_URL || 'https://mailing.konsul.digital';
+
+        let endpoint = `${mailingUrl}/api/v1/send`;
+        let payload: any = {};
+
+        if (actionName === 'Añadir a Lista de Envío') {
+          endpoint = `${mailingUrl}/api/v1/subscribers`;
+          const email = resolvedVariables['Email del Suscriptor'] || resolvedVariables['Email del Cliente'] || resolvedVariables['Email del Lead'] || resolvedVariables['email'] || '';
+          const name = resolvedVariables['Nombre del Suscriptor'] || resolvedVariables['Nombre del Cliente'] || resolvedVariables['Nombre del Lead'] || resolvedVariables['name'] || '';
+          payload = {
+            email,
+            name,
+            tags: ['Kônsul Suite', appCode],
+            listName: 'Clientes Kônsul',
+            userId: rule.userId
+          };
+        } else {
+          endpoint = `${mailingUrl}/api/v1/send`;
+          const to = resolvedVariables['Email Destinatario'] || resolvedVariables['Email del Cliente'] || resolvedVariables['Email del Lead'] || resolvedVariables['email'] || '';
+          const subject = resolvedVariables['Asunto del Correo'] || `Notificación de Kônsul (${triggerName})`;
+          const body = resolvedVariables['Cuerpo del Correo'] || `Hola ${resolvedVariables['Nombre del Cliente'] || ''},\n\nTe informamos que se ha procesado tu evento en Kônsul Suite.`;
+          payload = {
+            to,
+            subject,
+            body,
+            userId: rule.userId
+          };
+        }
+
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': targetIntegration.serviceKey || process.env.INTERNAL_API_KEY || 'konsul_ecosystem_secret_key',
+              'x-user-id': rule.userId
+            },
+            body: JSON.stringify(payload)
+          });
+
+          const resData = await response.json();
+
+          if (response.ok && resData.success) {
+            const log = await prisma.automationLog.create({
+              data: {
+                userId: rule.userId,
+                ruleId: rule.id,
+                sourceApp: appCode,
+                targetApp,
+                triggerName,
+                actionName,
+                status: 'SUCCESS',
+                payloadSent: payload,
+                responseRec: resData
+              }
+            });
+            executionResults.push({ ruleId: rule.id, status: 'SUCCESS', logId: log.id });
+          } else {
+            const log = await prisma.automationLog.create({
+              data: {
+                userId: rule.userId,
+                ruleId: rule.id,
+                sourceApp: appCode,
+                targetApp,
+                triggerName,
+                actionName,
+                status: 'FAILED',
+                errorDetails: resData.error?.message || resData.error || resData.message || 'Unknown error response from Mailing API',
+                payloadSent: payload,
+                responseRec: resData
+              }
+            });
+            executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });
+          }
+        } catch (fetchErr: any) {
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName,
+              status: 'FAILED',
+              errorDetails: fetchErr.message || 'Network error executing trigger fetch call to Mailing',
+              payloadSent: payload,
+              responseRec: Prisma.DbNull
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });
         }
       } else {
         // Other target apps placeholder (Mailing, Kredit, Reactivaleads, etc.)
