@@ -325,6 +325,7 @@ export async function POST(req: Request) {
             }
           });
           executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });
+        }
       } else if (targetApp === 'mailing') {
         const actionConfig = ALL_APPS.mailing.actions[rule.actionIdx];
         const actionName = actionConfig?.name || 'Acción en Mailing';
