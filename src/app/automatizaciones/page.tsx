@@ -232,6 +232,8 @@ export default async function AutomatizacionesPage() {
               initialIsActive={isActive}
               initialServiceKey={serviceKey}
               initialRules={dbRules}
+              userEmail={kindeUser.email || ''}
+              userName={kindeUser.given_name || kindeUser.name || ''}
             />
           );
         })}

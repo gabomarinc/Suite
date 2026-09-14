@@ -155,6 +155,14 @@ export async function POST(req: Request) {
         continue;
       }
 
+      // Look up user information for identity forwarding across the ecosystem
+      const ruleUser = await prisma.user.findUnique({
+        where: { id: rule.userId },
+        select: { email: true, name: true, firstName: true }
+      });
+      const userEmail = ruleUser?.email || '';
+      const userName = ruleUser?.name || ruleUser?.firstName || '';
+
       // Call target app endpoint
       if (targetApp === 'process') {
         const templateId = mappings['__templateId'];
@@ -182,7 +190,10 @@ export async function POST(req: Request) {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-api-key': targetIntegration.serviceKey
+              'x-api-key': targetIntegration.serviceKey,
+              'x-user-id': rule.userId,
+              'x-user-email': userEmail,
+              'x-user-name': userName
             },
             body: JSON.stringify({
               template_id: templateId,
@@ -307,7 +318,9 @@ export async function POST(req: Request) {
             method,
             headers: {
               'Content-Type': 'application/json',
-              'x-api-key': targetIntegration.serviceKey
+              'x-api-key': targetIntegration.serviceKey,
+              'x-user-id': rule.userId,
+              'x-user-email': userEmail
             },
             body: JSON.stringify(payload)
           });
@@ -401,7 +414,9 @@ export async function POST(req: Request) {
             headers: {
               'Content-Type': 'application/json',
               'x-api-key': targetIntegration.serviceKey || process.env.INTERNAL_API_KEY || 'konsul_ecosystem_secret_key',
-              'x-user-id': rule.userId
+              'x-user-id': rule.userId,
+              'x-user-email': userEmail,
+              'x-user-name': userName
             },
             body: JSON.stringify(payload)
           });

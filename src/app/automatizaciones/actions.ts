@@ -38,6 +38,80 @@ export async function toggleIntegration(appCode: string, currentStatus: boolean)
   revalidatePath('/automatizaciones');
 }
 
+export async function connectAppOneClick(appCode: string) {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  
+  if (!isAuth) {
+    throw new Error("No autenticado");
+  }
+
+  const user = await getUser();
+  if (!user || !user.id) {
+    throw new Error("Usuario no encontrado");
+  }
+
+  const ssoKey = `konsul_sso_${appCode}`;
+
+  await prisma.integration.upsert({
+    where: {
+      userId_appCode: {
+        userId: user.id,
+        appCode
+      }
+    },
+    update: {
+      serviceKey: ssoKey,
+      isActive: true
+    },
+    create: {
+      userId: user.id,
+      appCode,
+      serviceKey: ssoKey,
+      isActive: true
+    }
+  });
+
+  revalidatePath('/automatizaciones');
+  return { success: true, serviceKey: ssoKey };
+}
+
+export async function disconnectApp(appCode: string) {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  
+  if (!isAuth) {
+    throw new Error("No autenticado");
+  }
+
+  const user = await getUser();
+  if (!user || !user.id) {
+    throw new Error("Usuario no encontrado");
+  }
+
+  await prisma.integration.upsert({
+    where: {
+      userId_appCode: {
+        userId: user.id,
+        appCode
+      }
+    },
+    update: {
+      serviceKey: null,
+      isActive: false
+    },
+    create: {
+      userId: user.id,
+      appCode,
+      serviceKey: null,
+      isActive: false
+    }
+  });
+
+  revalidatePath('/automatizaciones');
+  return { success: true };
+}
+
 export async function saveServiceKey(appCode: string, serviceKey: string) {
   const { isAuthenticated, getUser } = getKindeServerSession();
   const isAuth = await isAuthenticated();
@@ -75,13 +149,14 @@ export async function saveServiceKey(appCode: string, serviceKey: string) {
 
 export async function testIntegration(appCode: string, serviceKey: string) {
   const prefixes: Record<string, string[]> = {
-    bills: ['kb_live_', 'kb_svc_', 'kb_test_'],
-    process: ['kp_live_', 'kp_svc_', 'kp_test_'],
-    reactivaleads: ['lh_live_', 'lh_svc_', 'lh_test_'],
-    kredit: ['kk_live_', 'kk_svc_', 'kk_test_'],
-    mailing: ['km_live_', 'km_svc_', 'km_test_']
+    bills: ['kb_live_', 'kb_svc_', 'kb_test_', 'konsul_sso_'],
+    process: ['kp_live_', 'kp_svc_', 'kp_test_', 'konsul_sso_'],
+    reactivaleads: ['lh_live_', 'lh_svc_', 'lh_test_', 'konsul_sso_'],
+    kredit: ['kk_live_', 'kk_svc_', 'kk_test_', 'konsul_sso_'],
+    mailing: ['km_live_', 'km_svc_', 'km_test_', 'konsul_sso_']
   };
 
+  const isSso = serviceKey.startsWith('konsul_sso_');
   const allowedPrefixes = prefixes[appCode];
   const isValid = allowedPrefixes?.some(prefix => serviceKey.startsWith(prefix));
 
@@ -95,7 +170,7 @@ export async function testIntegration(appCode: string, serviceKey: string) {
 
   const logs: string[] = [
     `Conexión con el servidor establecida.`,
-    `Autenticando con Service Key: ${serviceKey.substring(0, 10)}...`
+    isSso ? `Autenticando mediante Kônsul SSO (Identidad Unificada)...` : `Autenticando con Service Key: ${serviceKey.substring(0, 10)}...`
   ];
 
   try {

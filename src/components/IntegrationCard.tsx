@@ -10,7 +10,9 @@ import {
   toggleAutomationRule,
   getAutomationRules,
   fetchProcessTemplates,
-  getConnectedIntegrations
+  getConnectedIntegrations,
+  connectAppOneClick,
+  disconnectApp
 } from '../app/automatizaciones/actions';
 import { ALL_APPS, APP_NAMES_MAP, type AppConfig } from '@/lib/appsConfig';
 
@@ -29,6 +31,8 @@ interface IntegrationCardProps {
   initialIsActive: boolean;
   initialServiceKey: string;
   initialRules: any[];
+  userEmail?: string;
+  userName?: string;
 }
 
 interface AutomationRule {
@@ -48,6 +52,8 @@ export default function IntegrationCard({
   initialIsActive,
   initialServiceKey,
   initialRules,
+  userEmail = '',
+  userName = '',
 }: IntegrationCardProps) {
   const [isActive, setIsActive] = useState(initialIsActive);
   const [serviceKey, setServiceKey] = useState(initialServiceKey);
@@ -56,6 +62,11 @@ export default function IntegrationCard({
   const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [testLog, setTestLog] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  // 1-Click SSO & Dev Mode States
+  const [isConnectingSso, setIsConnectingSso] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [showDevMode, setShowDevMode] = useState(false);
 
   // Accordion & Tab State
   const [isExpanded, setIsExpanded] = useState(false);
@@ -161,6 +172,58 @@ export default function IntegrationCard({
       window.dispatchEvent(new Event('konsul_integrations_updated'));
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleConnectSso = async () => {
+    setIsConnectingSso(true);
+    setTestStatus('loading');
+    setTestLog([
+      `Iniciando protocolo Kônsul SSO...`,
+      `Identificando usuario Kinde (${userEmail || 'sesión activa'})...`,
+      `Vinculando ${app.name} al ecosistema Kônsul...`
+    ]);
+    try {
+      const res = await connectAppOneClick(app.code);
+      if (res.success) {
+        setServiceKey(res.serviceKey);
+        setInputKey(res.serviceKey);
+        setIsActive(true);
+        setTestStatus('success');
+        setTestLog(prev => [
+          ...prev,
+          `Identidad verificada exitosamente.`,
+          `Cuenta y espacio de trabajo aprovisionados.`,
+          `¡${app.name} conectada y activa en la Suite!`
+        ]);
+        window.dispatchEvent(new Event('konsul_integrations_updated'));
+      }
+    } catch (err) {
+      console.error('Error al conectar con Kônsul SSO:', err);
+      setTestStatus('error');
+      setTestLog(prev => [...prev, 'Error de red o autenticación al sincronizar con SSO.']);
+    } finally {
+      setIsConnectingSso(false);
+    }
+  };
+
+  const handleDisconnectSso = async () => {
+    if (!confirm(`¿Estás seguro de que deseas desconectar ${app.name}?`)) return;
+    setIsDisconnecting(true);
+    try {
+      const res = await disconnectApp(app.code);
+      if (res.success) {
+        setServiceKey('');
+        setInputKey('');
+        setIsActive(false);
+        setTestStatus('idle');
+        setTestLog([]);
+        window.dispatchEvent(new Event('konsul_integrations_updated'));
+      }
+    } catch (err) {
+      console.error('Error al desconectar:', err);
+    } finally {
+      setIsDisconnecting(false);
     }
   };
 
@@ -436,7 +499,7 @@ export default function IntegrationCard({
             
             <div className="app-meta-tags">
               <span className="app-meta-tag-item">
-                <strong>PREFIX:</strong> {app.keyPrefix}
+                <strong>AUTENTICACIÓN:</strong> {serviceKey?.startsWith('konsul_sso_') ? 'KÔNSUL SSO (1 CLIC)' : isConnected ? 'SERVICE KEY' : 'KÔNSUL SSO'}
               </span>
               <span>•</span>
               <span className="app-meta-tag-item">
@@ -525,9 +588,9 @@ export default function IntegrationCard({
               className={`accordion-tab-btn ${activeTab === 'credentials' ? 'active' : ''}`}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
               </svg>
-              <span>Credenciales (Service Key)</span>
+              <span>Conexión & Credenciales</span>
             </button>
           </div>
 
@@ -1162,77 +1225,227 @@ export default function IntegrationCard({
             </div>
           )}
 
-          {/* TAB 3: CREDENCIALES & SERVICE KEY */}
+          {/* TAB 3: CONEXIÓN & CREDENCIALES */}
           {activeTab === 'credentials' && (
-            <div style={{ background: '#ffffff', borderRadius: '18px', padding: '2rem', border: '1px solid var(--border-color)' }}>
-              <form onSubmit={handleSave}>
-                <div className="input-group-full" style={{ marginBottom: '1.25rem' }}>
-                  <label>SERVICE KEY ({app.keyPrefix}...)</label>
-                  <div className="input-with-icon">
-                    <div className="input-icon">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* PRIMARY 1-CLICK KÔNSUL SSO CONNECTION CARD */}
+              <div className={`sso-connect-card ${isConnected ? 'connected' : ''}`}>
+                <div className="sso-card-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '12px',
+                      background: isConnected ? '#dcfce7' : '#f1f5f9',
+                      color: isConnected ? '#15803d' : '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                      </svg>
                     </div>
-                    <input 
-                      type={showPassword ? "text" : "password"} 
-                      value={inputKey}
-                      onChange={(e) => {
-                        setInputKey(e.target.value);
-                        setTestStatus('idle');
-                      }}
-                      placeholder={`Ej: ${app.keyPrefix.split(' ')[0]}xxxxxxxx`} 
-                      autoComplete="new-password"
-                      style={{ paddingRight: '2.5rem' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: '1rem',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: '#94a3b8',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                      title={showPassword ? "Ocultar" : "Mostrar"}
-                    >
-                      {showPassword ? (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                          <line x1="1" y1="1" x2="23" y2="23"></line>
-                        </svg>
-                      ) : (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                          <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                      )}
-                    </button>
+                    <div>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        Autenticación Unificada
+                      </div>
+                      <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                        Kônsul SSO (1 Clic)
+                      </h3>
+                    </div>
+                  </div>
+
+                  {isConnected ? (
+                    <span className="sso-badge-pill connected">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"></circle></svg>
+                      <span>VINCULADO Y ACTIVO</span>
+                    </span>
+                  ) : (
+                    <span className="sso-badge-pill disconnected">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"></circle></svg>
+                      <span>NO VINCULADO</span>
+                    </span>
+                  )}
+                </div>
+
+                <div className="sso-card-body">
+                  <p>
+                    {isConnected 
+                      ? `${app.name} está conectada y sincronizada con tu cuenta. Las automatizaciones pueden intercambiar datos en tiempo real de forma instantánea.`
+                      : `Conecta ${app.name} con un solo clic. El ecosistema aprovisiona y sincroniza tu cuenta automáticamente con tu sesión de Kônsul sin requerir tokens ni configuraciones complejas.`}
+                  </p>
+
+                  <div className="sso-account-info-box">
+                    <div className="sso-account-item">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                      </svg>
+                      <div className="sso-account-details">
+                        <span className="sso-account-label">Cuenta Kônsul Activa</span>
+                        <span className="sso-account-email">{userEmail || 'somos@konsul.digital'}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                      Protocolo Kônsul Connect v1
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {isConnected ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInputKey(serviceKey);
+                            handleTestConnection();
+                          }}
+                          className="btn-test-connection"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                          <span>Probar Conexión</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDisconnectSso}
+                          disabled={isDisconnecting}
+                          className="btn-sso-disconnect"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                          <span>{isDisconnecting ? 'Desconectando...' : 'Desconectar App'}</span>
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleConnectSso}
+                        disabled={isConnectingSso}
+                        className="btn-sso-connect"
+                      >
+                        {isConnectingSso ? (
+                          <>
+                            <svg className="spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+                            <span>Vinculando mediante SSO...</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                            <span>Vincular {app.name} en 1 Clic</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
+              </div>
 
-                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-                  <button 
-                    type="button" 
-                    onClick={handleTestConnection}
-                    className="btn-test-connection"
+              {/* SECONDARY DEVELOPER ACCORDION (MANUAL SERVICE KEY) */}
+              <div className="dev-mode-accordion">
+                <button
+                  type="button"
+                  onClick={() => setShowDevMode(!showDevMode)}
+                  className="dev-mode-toggle-bar"
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                    <span>Opciones avanzadas para desarrolladores (Service Key manual)</span>
+                  </div>
+                  <svg 
+                    width="14" 
+                    height="14" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                    style={{ transform: showDevMode ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
                   >
-                    Probar Conexión
-                  </button>
-                  <button 
-                    type="submit" 
-                    className="btn-brand-teal"
-                    disabled={isSaving}
-                  >
-                    {isSaving ? 'Guardando...' : 'Guardar Key'}
-                  </button>
-                </div>
-              </form>
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
 
-              {/* Test Results Output */}
+                {showDevMode && (
+                  <div className="dev-mode-content">
+                    <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '1rem', lineHeight: 1.5 }}>
+                      Si estás probando una instancia local o una clave dedicada de servicio externa, puedes ingresar manualmente una Service Key con prefijo <code>{app.keyPrefix}</code>.
+                    </p>
+
+                    <form onSubmit={handleSave}>
+                      <div className="input-group-full" style={{ marginBottom: '1.25rem' }}>
+                        <label>SERVICE KEY MANUAL ({app.keyPrefix}...)</label>
+                        <div className="input-with-icon">
+                          <div className="input-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                          </div>
+                          <input 
+                            type={showPassword ? "text" : "password"} 
+                            value={inputKey}
+                            onChange={(e) => {
+                              setInputKey(e.target.value);
+                              setTestStatus('idle');
+                            }}
+                            placeholder={`Ej: ${app.keyPrefix.split(' ')[0]}xxxxxxxx`} 
+                            autoComplete="new-password"
+                            style={{ paddingRight: '2.5rem' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            style={{
+                              position: 'absolute',
+                              right: '1rem',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: '#94a3b8',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                            title={showPassword ? "Ocultar" : "Mostrar"}
+                          >
+                            {showPassword ? (
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                <line x1="1" y1="1" x2="23" y2="23"></line>
+                              </svg>
+                            ) : (
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                        <button 
+                          type="button" 
+                          onClick={handleTestConnection}
+                          className="btn-test-connection"
+                        >
+                          Probar Conexión
+                        </button>
+                        <button 
+                          type="submit" 
+                          className="btn-brand-teal"
+                          disabled={isSaving}
+                        >
+                          {isSaving ? 'Guardando...' : 'Guardar Key Manual'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </div>
+
+              {/* TEST RESULTS LOG OUTPUT */}
               {testStatus !== 'idle' && (
                 <div className={`test-results-log ${testStatus}`}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', fontWeight: 'bold' }}>
@@ -1265,6 +1478,7 @@ export default function IntegrationCard({
                   </div>
                 </div>
               )}
+
             </div>
           )}
 
