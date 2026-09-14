@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
-import Stripe from 'stripe';
+import { stripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
-
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_WEBHOOK_SECRET || '';
-const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2024-06-20' as any,
-});
 
 export async function GET(req: Request) {
   try {

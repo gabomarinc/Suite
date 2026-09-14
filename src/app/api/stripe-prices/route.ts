@@ -1,15 +1,9 @@
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
-
-const key = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_WEBHOOK_SECRET || '';
-
-const stripe = new Stripe(key, {
-  apiVersion: '2024-06-20' as any,
-});
+import { stripe } from '@/lib/stripe';
 
 export async function GET() {
   try {
-    if (!key) {
+    if (!process.env.STRIPE_SECRET_KEY && !process.env.STRIPE_WEBHOOK_SECRET) {
       return NextResponse.json({ error: "Stripe key not found in env" });
     }
     const prices = await stripe.prices.list({
