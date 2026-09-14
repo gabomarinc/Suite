@@ -472,9 +472,129 @@ export async function POST(req: Request) {
           });
           executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });
         }
+      } else if (targetApp === 'reactivaleads') {
+        const actionConfig = ALL_APPS.reactivaleads?.actions[rule.actionIdx];
+        const actionName = actionConfig?.name || 'Acción en Reactivaleads';
+        const reactivaUrl = process.env.NEXT_PUBLIC_REACTIVALEADS_URL || 'https://reactivaleads.konsul.digital';
+
+        try {
+          const response = await fetch(`${reactivaUrl}/api/v1/leads`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': targetIntegration.serviceKey || 'konsul_ecosystem_secret_key',
+              'x-user-id': rule.userId,
+              'x-user-email': userEmail,
+              'x-user-name': userName
+            },
+            body: JSON.stringify({
+              action: actionName,
+              variables: resolvedVariables
+            })
+          });
+
+          let resData: any = {};
+          try {
+            resData = await response.json();
+          } catch (e) {
+            resData = { message: 'Respuesta recibida de Reactivaleads' };
+          }
+
+          const isSuccess = response.ok;
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName,
+              status: isSuccess ? 'SUCCESS' : 'FAILED',
+              errorDetails: isSuccess ? null : (resData.error?.message || resData.error || 'Error al procesar acción en Reactivaleads'),
+              payloadSent: resolvedVariables,
+              responseRec: resData
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: isSuccess ? 'SUCCESS' : 'FAILED', logId: log.id });
+        } catch (fetchErr: any) {
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName,
+              status: 'FAILED',
+              errorDetails: fetchErr.message || 'Error de conexión con Reactivaleads',
+              payloadSent: resolvedVariables,
+              responseRec: Prisma.DbNull
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });
+        }
+      } else if (targetApp === 'kredit') {
+        const actionConfig = ALL_APPS.kredit?.actions[rule.actionIdx];
+        const actionName = actionConfig?.name || 'Acción en Kredit';
+        const kreditUrl = process.env.NEXT_PUBLIC_KREDIT_URL || 'https://kredit.konsul.digital';
+
+        try {
+          const response = await fetch(`${kreditUrl}/api/v1/evaluations`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': targetIntegration.serviceKey || 'konsul_ecosystem_secret_key',
+              'x-user-id': rule.userId,
+              'x-user-email': userEmail,
+              'x-user-name': userName
+            },
+            body: JSON.stringify({
+              action: actionName,
+              variables: resolvedVariables
+            })
+          });
+
+          let resData: any = {};
+          try {
+            resData = await response.json();
+          } catch (e) {
+            resData = { message: 'Respuesta recibida de Kredit' };
+          }
+
+          const isSuccess = response.ok;
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName,
+              status: isSuccess ? 'SUCCESS' : 'FAILED',
+              errorDetails: isSuccess ? null : (resData.error?.message || resData.error || 'Error al procesar acción en Kredit'),
+              payloadSent: resolvedVariables,
+              responseRec: resData
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: isSuccess ? 'SUCCESS' : 'FAILED', logId: log.id });
+        } catch (fetchErr: any) {
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName,
+              status: 'FAILED',
+              errorDetails: fetchErr.message || 'Error de conexión con Kredit',
+              payloadSent: resolvedVariables,
+              responseRec: Prisma.DbNull
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });
+        }
       } else {
-        // Other target apps placeholder (Mailing, Kredit, Reactivaleads, etc.)
-        // For now, record as success/not implemented
         const log = await prisma.automationLog.create({
           data: {
             userId: rule.userId,
@@ -484,7 +604,7 @@ export async function POST(req: Request) {
             triggerName,
             actionName: ALL_APPS[targetApp]?.actions[rule.actionIdx]?.name || 'Acción',
             status: 'FAILED',
-            errorDetails: `Execution engine for target app ${targetApp} not implemented yet`,
+            errorDetails: `Destino ${targetApp} desconocido`,
             payloadSent: resolvedVariables,
             responseRec: Prisma.DbNull
           }

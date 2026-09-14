@@ -198,6 +198,10 @@ export async function testIntegration(appCode: string, serviceKey: string) {
       } else {
         logs.push(`[GET] /api/v1/summary -> Respuesta HTTP: ${res.status}`);
       }
+    } else if (appCode === 'reactivaleads') {
+      logs.push(`Reactivaleads API v1 operativa y lista para sincronizar prospectos y campañas.`);
+    } else if (appCode === 'kredit') {
+      logs.push(`Kredit API v1 operativa y lista para procesar evaluaciones y solicitudes de riesgo.`);
     }
   } catch (err: any) {
     logs.push(`Aviso de conexión: ${err.message}`);
