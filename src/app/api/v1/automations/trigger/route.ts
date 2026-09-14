@@ -25,14 +25,137 @@ export async function OPTIONS() {
 
 export async function POST(req: Request) {
   try {
-    const { appCode, triggerName, userId, data = {} } = await req.json();
+    const rawBody = await req.json().catch(() => ({}));
+    const headers = req.headers;
+    const sourceAppHeader = (headers.get('x-source-app') || '').toLowerCase();
+    const apiKeyHeader = headers.get('x-api-key') || '';
+    const workspaceIdHeader = headers.get('x-workspace-id') || '';
+    const userEmailHeader = headers.get('x-user-email') || '';
 
-    if (!appCode || !triggerName || !userId) {
-      return jsonResponse({ success: false, error: "Missing parameters" }, { status: 400 });
+    let appCode = rawBody.appCode;
+    let triggerName = rawBody.triggerName;
+    let userId = rawBody.userId;
+    let data = rawBody.data || {};
+
+    // --- SUPPORT FOR LEADSHUB WEBHOOK CONTRACT (Section 01) ---
+    // If incoming request is from LeadsHUB via contract:
+    // Headers: x-source-app: leadshub, x-api-key, x-workspace-id
+    // Body: { event: "contact:created", timestamp: "...", data: { ... } }
+    if (sourceAppHeader === 'leadshub' || sourceAppHeader === 'reactivaleads' || rawBody.event) {
+      appCode = 'leadshub';
+      const event = rawBody.event || '';
+
+      if (event === 'contact:created' || event === 'lead.created') {
+        triggerName = 'Nuevo Lead Registrado (Chat / Form)';
+        data = {
+          'ID del Lead': data.contactId || data.id || '',
+          'Nombre del Lead': data.name || data.contactName || '',
+          'Email del Lead': data.email || data.contactEmail || '',
+          'Teléfono del Lead': data.phone || data.contactPhone || '',
+          'Origen / Canal': data.channel || 'WhatsApp',
+          'Estado de Embudo': data.status || data.prospectStatus || 'Nuevo',
+          'Puntaje de Scoring': String(data.leadScore || data.score || '50'),
+          'Etiquetas del Lead': Array.isArray(data.tags) ? data.tags.join(', ') : (data.tags || ''),
+          'Resumen de IA': data.summary || data.aiSummary || '',
+          'Notas / Mensaje': data.notes || data.message || '',
+          'Fecha de Registro': rawBody.timestamp || new Date().toISOString(),
+          ...data
+        };
+      } else if (event === 'contact:status_changed' || event === 'lead.status_changed') {
+        triggerName = 'Estado de Prospecto Cambiado (Embudo Kanban)';
+        data = {
+          'ID del Lead': data.contactId || data.id || '',
+          'Nombre del Lead': data.name || data.contactName || '',
+          'Email del Lead': data.email || data.contactEmail || '',
+          'Teléfono del Lead': data.phone || data.contactPhone || '',
+          'Estado Anterior': data.prevStatus || '',
+          'Nuevo Estado de Embudo': data.newStatus || '',
+          'Puntaje de Scoring': String(data.leadScore || data.score || ''),
+          'Asesor Asignado': data.assignedTo || '',
+          'Resumen de IA': data.summary || '',
+          'Fecha de Actualización': rawBody.timestamp || new Date().toISOString(),
+          ...data
+        };
+      } else if (event === 'calendar:event_created' || event === 'meeting.created') {
+        triggerName = 'Cita o Reunión Agendada';
+        data = {
+          'ID de Cita': data.eventId || data.id || '',
+          'Título de Cita': data.title || 'Cita Agendada por Agente',
+          'Nombre del Lead': data.contactName || data.name || '',
+          'Email del Lead': data.contactEmail || data.email || '',
+          'Teléfono del Lead': data.contactPhone || data.phone || '',
+          'Fecha y Hora de Inicio': data.startTime || '',
+          'Fecha y Hora de Fin': data.endTime || '',
+          'Enlace de Reunión / Ubicación': data.location || data.meetUrl || '',
+          'Categoría de Cita': data.category || 'Demostración',
+          ...data
+        };
+      } else if (event === 'conversation:handoff_requested' || event === 'chat.handoff') {
+        triggerName = 'Conversación Transferida a Humano (Handoff)';
+        data = {
+          'ID de Conversación': data.conversationId || data.id || '',
+          'ID del Lead': data.contactId || '',
+          'Nombre del Lead': data.contactName || data.name || '',
+          'Email del Lead': data.contactEmail || data.email || '',
+          'Teléfono del Lead': data.contactPhone || data.phone || '',
+          'Canal (WhatsApp / Instagram / Web)': data.channel || 'WhatsApp',
+          'Motivo de Transferencia': data.department || data.reason || 'Solicita atención humana',
+          'Asesor Asignado': data.assignedTo || '',
+          'Último Mensaje del Cliente': data.lastMessage || data.message || '',
+          ...data
+        };
+      } else if (event === 'lead.intent_detected' || event === 'intent:detected') {
+        triggerName = 'Intención Comercial Detectada por IA';
+        data = {
+          'ID del Lead': data.contactId || data.id || '',
+          'Nombre del Lead': data.name || '',
+          'Email del Lead': data.email || '',
+          'Teléfono del Lead': data.phone || '',
+          'Servicio o Producto de Interés': data.service || data.interest || '',
+          'Presupuesto Mencionado': data.budget || '',
+          'Nivel de Urgencia': data.urgency || 'Alto',
+          'Resumen de Necesidad': data.summary || '',
+          ...data
+        };
+      } else if (event) {
+        triggerName = event;
+      }
+
+      // Resolve user by email or workspace if userId not supplied directly
+      if (!userId) {
+        if (userEmailHeader) {
+          const u = await prisma.user.findFirst({
+            where: { email: { equals: userEmailHeader, mode: 'insensitive' } }
+          });
+          if (u) userId = u.id;
+        }
+
+        if (!userId && workspaceIdHeader) {
+          const integ = await prisma.integration.findFirst({
+            where: {
+              appCode: { in: ['leadshub', 'reactivaleads'] },
+              serviceKey: workspaceIdHeader
+            }
+          });
+          if (integ) userId = integ.userId;
+        }
+
+        if (!userId && (data.email || data['Email del Lead'])) {
+          const emailToFind = data.email || data['Email del Lead'];
+          const u = await prisma.user.findFirst({
+            where: { email: { equals: emailToFind, mode: 'insensitive' } }
+          });
+          if (u) userId = u.id;
+        }
+      }
     }
 
-    // Resolve triggerIdx from triggerName
-    const appConfig = ALL_APPS[appCode];
+    if (!appCode || !triggerName || !userId) {
+      return jsonResponse({ success: false, error: "Missing parameters (appCode, triggerName, userId)" }, { status: 400 });
+    }
+
+    // Resolve triggerIdx from triggerName with support for both leadshub & reactivaleads aliases
+    const appConfig = ALL_APPS[appCode] || ALL_APPS.reactivaleads;
     if (!appConfig) {
       return jsonResponse({ success: false, error: `App config not found for ${appCode}` }, { status: 404 });
     }
@@ -44,7 +167,7 @@ export async function POST(req: Request) {
 
     const cleanUserId = userId.startsWith('kinde_') ? userId.replace('kinde_', '') : userId;
 
-    // Resolve target userId using either id or legacyId to bridge Kinde IDs with Bills legacy IDs
+    // Resolve target userId using either id or legacyId to bridge Kinde IDs with legacy IDs
     const dbUser = await prisma.user.findFirst({
       where: {
         OR: [
@@ -58,11 +181,15 @@ export async function POST(req: Request) {
 
     const resolvedUserId = dbUser ? dbUser.id : cleanUserId;
 
-    // Find active automation rules
+    // Find active automation rules (support app aliases leadshub <-> reactivaleads)
+    const sourceAppList = [appCode];
+    if (appCode === 'leadshub') sourceAppList.push('reactivaleads');
+    if (appCode === 'reactivaleads') sourceAppList.push('leadshub');
+
     const rules = await prisma.automationRule.findMany({
       where: {
         userId: { in: [userId, cleanUserId, resolvedUserId] },
-        sourceApp: appCode,
+        sourceApp: { in: sourceAppList },
         triggerIdx,
         isActive: true
       }
@@ -126,7 +253,7 @@ export async function POST(req: Request) {
       }
 
       // Fetch target integration details using the correct rule.userId
-      const targetIntegration = await prisma.integration.findUnique({
+      let targetIntegration = await prisma.integration.findUnique({
         where: {
           userId_appCode: {
             userId: rule.userId,
@@ -134,6 +261,35 @@ export async function POST(req: Request) {
           }
         }
       });
+
+      if (!targetIntegration && (targetApp === 'leadshub' || targetApp === 'reactivaleads')) {
+        const altApp = targetApp === 'leadshub' ? 'reactivaleads' : 'leadshub';
+        targetIntegration = await prisma.integration.findUnique({
+          where: {
+            userId_appCode: {
+              userId: rule.userId,
+              appCode: altApp
+            }
+          }
+        });
+      }
+
+      // Auto-fallback for LeadsHUB shared secret authentication (Section 03 of contract)
+      const sharedSecret = process.env.KONSUL_ECOSYSTEM_SECRET_KEY 
+        || process.env.INTERNAL_API_KEY 
+        || 'konsul_ecosystem_secret_key';
+
+      if (!targetIntegration && (targetApp === 'leadshub' || targetApp === 'reactivaleads')) {
+        targetIntegration = {
+          id: 'auto_lh_' + rule.userId,
+          userId: rule.userId,
+          appCode: targetApp,
+          serviceKey: sharedSecret,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+      }
 
       if (!targetIntegration || !targetIntegration.isActive || !targetIntegration.serviceKey) {
         // Record failure
@@ -476,7 +632,11 @@ export async function POST(req: Request) {
         const appCfg = ALL_APPS[targetApp] || ALL_APPS.reactivaleads;
         const actionConfig = appCfg?.actions[rule.actionIdx];
         const actionName = actionConfig?.name || 'Acción en LeadsHUB';
-        const leadshubUrl = process.env.NEXT_PUBLIC_LEADSHUB_URL || process.env.NEXT_PUBLIC_REACTIVALEADS_URL || 'https://leadshub.konsul.digital';
+        const leadshubUrl = process.env.LEADSHUB_URL 
+          || process.env.REACTIVALEADS_URL 
+          || process.env.NEXT_PUBLIC_LEADSHUB_URL 
+          || process.env.NEXT_PUBLIC_REACTIVALEADS_URL 
+          || 'https://reactivaleads.konsul.digital';
 
         // Select endpoint and formatted payload according to action
         let endpoint = `${leadshubUrl}/api/v1/contacts`;
@@ -492,10 +652,13 @@ export async function POST(req: Request) {
           };
         } else if (actionName.includes('Crear o Actualizar Lead')) {
           endpoint = `${leadshubUrl}/api/v1/contacts`;
+          const phoneVal = resolvedVariables['Teléfono del Lead'] || resolvedVariables['Teléfono del Cliente'] || resolvedVariables['Teléfono'] || undefined;
+          const emailVal = resolvedVariables['Email del Lead'] || resolvedVariables['Email del Cliente'] || undefined;
           requestBody = {
             name: resolvedVariables['Nombre del Lead'] || resolvedVariables['Nombre del Cliente'] || '',
-            email: resolvedVariables['Email del Lead'] || resolvedVariables['Email del Cliente'] || '',
-            phone: resolvedVariables['Teléfono del Lead'] || resolvedVariables['Teléfono del Cliente'] || resolvedVariables['Teléfono'] || '',
+            ...(phoneVal ? { phone: phoneVal } : {}),
+            ...(emailVal ? { email: emailVal } : {}),
+            identifier: phoneVal || emailVal || '',
             prospectStatus: resolvedVariables['Estado de Embudo'] || 'Nuevo',
             tags: resolvedVariables['Etiquetas (separadas por coma)'] 
               ? resolvedVariables['Etiquetas (separadas por coma)'].split(',').map((t: string) => t.trim()) 
@@ -543,16 +706,28 @@ export async function POST(req: Request) {
           };
         }
 
+        // Prepare headers according to Section 03 of LeadsHUB Contract
+        const rawKey = targetIntegration.serviceKey || sharedSecret;
+        const isLiveApiKey = rawKey.startsWith('lh_') || rawKey.startsWith('kp_');
+        const apiKey = isLiveApiKey ? rawKey : sharedSecret;
+        const workspaceId = (!isLiveApiKey && rawKey !== sharedSecret && rawKey.length > 5) ? rawKey : undefined;
+
+        const lhHeaders: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'x-user-id': rule.userId,
+          'x-user-email': userEmail,
+          'x-user-name': userName
+        };
+
+        if (workspaceId) {
+          lhHeaders['x-workspace-id'] = workspaceId;
+        }
+
         try {
           const response = await fetch(endpoint, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': targetIntegration.serviceKey || 'konsul_ecosystem_secret_key',
-              'x-user-id': rule.userId,
-              'x-user-email': userEmail,
-              'x-user-name': userName
-            },
+            headers: lhHeaders,
             body: JSON.stringify(requestBody)
           });
 
@@ -561,6 +736,23 @@ export async function POST(req: Request) {
             resData = await response.json();
           } catch (e) {
             resData = { message: 'Respuesta recibida de LeadsHUB' };
+          }
+
+          // Section 04: Save discovered workspaceId for subsequent direct calls
+          const returnedWsId = resData?.workspaceId || resData?.data?.workspaceId;
+          if (returnedWsId) {
+            if (!targetIntegration.id.startsWith('auto_lh_')) {
+              await prisma.integration.update({
+                where: { id: targetIntegration.id },
+                data: { serviceKey: returnedWsId }
+              }).catch(() => {});
+            } else {
+              await prisma.integration.upsert({
+                where: { userId_appCode: { userId: rule.userId, appCode: targetApp } },
+                create: { userId: rule.userId, appCode: targetApp, serviceKey: returnedWsId, isActive: true },
+                update: { serviceKey: returnedWsId, isActive: true }
+              }).catch(() => {});
+            }
           }
 
           const isSuccess = response.ok;

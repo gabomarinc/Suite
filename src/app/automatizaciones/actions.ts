@@ -644,6 +644,99 @@ export async function retryAutomationLog(logId: string) {
     } catch (fetchErr: any) {
       return { success: false, error: fetchErr.message || 'Error de red con Bills' };
     }
+  } else if (log.targetApp === 'reactivaleads' || log.targetApp === 'leadshub') {
+    const leadshubUrl = process.env.LEADSHUB_URL 
+      || process.env.REACTIVALEADS_URL 
+      || process.env.NEXT_PUBLIC_LEADSHUB_URL 
+      || process.env.NEXT_PUBLIC_REACTIVALEADS_URL 
+      || 'https://reactivaleads.konsul.digital';
+
+    const actionName = log.actionName || '';
+    let endpoint = `${leadshubUrl}/api/v1/contacts`;
+
+    if (actionName.includes('Mensaje Proactivo') || actionName.includes('WhatsApp')) {
+      endpoint = `${leadshubUrl}/api/v1/messages/send`;
+    } else if (actionName.includes('Mover Lead de Estado')) {
+      endpoint = `${leadshubUrl}/api/v1/contacts/status`;
+    } else if (actionName.includes('Añadir Etiquetas')) {
+      endpoint = `${leadshubUrl}/api/v1/contacts/tags`;
+    } else if (actionName.includes('Agendar Cita')) {
+      endpoint = `${leadshubUrl}/api/v1/calendar/events`;
+    } else if (actionName.includes('Registrar Nota')) {
+      endpoint = `${leadshubUrl}/api/v1/contacts/activity`;
+    } else if (actionName.includes('Asignar Asesor')) {
+      endpoint = `${leadshubUrl}/api/v1/conversations/assign`;
+    }
+
+    const sharedSecret = process.env.KONSUL_ECOSYSTEM_SECRET_KEY 
+      || process.env.INTERNAL_API_KEY 
+      || 'konsul_ecosystem_secret_key';
+
+    const rawKey = targetIntegration.serviceKey || sharedSecret;
+    const isLiveApiKey = rawKey.startsWith('lh_') || rawKey.startsWith('kp_');
+    const apiKey = isLiveApiKey ? rawKey : sharedSecret;
+    const workspaceId = (!isLiveApiKey && rawKey !== sharedSecret && rawKey.length > 5) ? rawKey : undefined;
+
+    const lhHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'x-user-id': user.id,
+      'x-user-email': user.email || ''
+    };
+    if (workspaceId) {
+      lhHeaders['x-workspace-id'] = workspaceId;
+    }
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: lhHeaders,
+        body: JSON.stringify(log.payloadSent)
+      });
+
+      let resData: any = {};
+      try {
+        resData = await response.json();
+      } catch (e) {
+        resData = { message: 'Respuesta recibida de LeadsHUB' };
+      }
+
+      if (response.ok) {
+        await prisma.automationLog.create({
+          data: {
+            userId: user.id,
+            ruleId: log.ruleId,
+            sourceApp: log.sourceApp,
+            targetApp: log.targetApp,
+            triggerName: log.triggerName,
+            actionName: log.actionName,
+            status: 'SUCCESS',
+            payloadSent: log.payloadSent as any,
+            responseRec: resData
+          }
+        });
+        return { success: true, message: "Re-ejecución exitosa en LeadsHUB" };
+      } else {
+        const errMsg = resData.error?.message || resData.error || 'Error en LeadsHUB API';
+        await prisma.automationLog.create({
+          data: {
+            userId: user.id,
+            ruleId: log.ruleId,
+            sourceApp: log.sourceApp,
+            targetApp: log.targetApp,
+            triggerName: log.triggerName,
+            actionName: log.actionName,
+            status: 'FAILED',
+            errorDetails: `[Re-intento] ${errMsg}`,
+            payloadSent: log.payloadSent as any,
+            responseRec: resData
+          }
+        });
+        return { success: false, error: errMsg };
+      }
+    } catch (fetchErr: any) {
+      return { success: false, error: fetchErr.message || 'Error de red con LeadsHUB' };
+    }
   } else {
     // Other apps placeholder
     await prisma.automationLog.create({
