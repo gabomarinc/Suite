@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { LogoutLink } from "@kinde-oss/kinde-auth-nextjs/components";
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { sendSupportRequest } from '@/app/actions/support';
 
 interface SidebarProps {
   user: {
@@ -18,6 +19,39 @@ interface SidebarProps {
 export default function Sidebar({ user, isLocked = false }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
+
+  // Support Modal State
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
+  const [supportCategory, setSupportCategory] = useState('Consulta General');
+  const [supportMessage, setSupportMessage] = useState('');
+  const [supportEmail, setSupportEmail] = useState(user?.email || '');
+  const [isSubmittingSupport, setIsSubmittingSupport] = useState(false);
+  const [supportSuccess, setSupportSuccess] = useState(false);
+
+  const handleSendSupport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supportMessage.trim()) return;
+    setIsSubmittingSupport(true);
+    try {
+      await sendSupportRequest({
+        email: supportEmail || user?.email || '',
+        category: supportCategory,
+        message: supportMessage.trim()
+      });
+      setSupportSuccess(true);
+    } catch (err) {
+      console.error('Error enviando soporte:', err);
+      alert('Error al enviar la solicitud de ayuda.');
+    } finally {
+      setIsSubmittingSupport(false);
+    }
+  };
+
+  const closeSupportModal = () => {
+    setIsSupportOpen(false);
+    setSupportSuccess(false);
+    setSupportMessage('');
+  };
 
   // Navigation Items by section
   const generalItems = [
@@ -39,7 +73,6 @@ export default function Sidebar({ user, isLocked = false }: SidebarProps) {
     {
       name: 'Bills (Facturas)',
       href: 'https://bills.konsul.digital/api/auth/login?prompt=none',
-      badge: 'Nuevo',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -54,7 +87,6 @@ export default function Sidebar({ user, isLocked = false }: SidebarProps) {
     {
       name: 'Process (Flujos)',
       href: 'https://process.konsul.digital/api/auth/login?prompt=none',
-      badge: 'Nuevo',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
@@ -65,7 +97,6 @@ export default function Sidebar({ user, isLocked = false }: SidebarProps) {
     {
       name: 'Reactivaleads (Leads)',
       href: 'https://reactivaleads.konsul.digital/api/auth/login?prompt=none',
-      badge: 'Nuevo',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -238,9 +269,14 @@ export default function Sidebar({ user, isLocked = false }: SidebarProps) {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
               <span>Centro de Ayuda</span>
             </div>
-            <a href="https://konsul.digital" target="_blank" rel="noopener noreferrer" className="help-btn">
+            <button 
+              type="button" 
+              onClick={() => setIsSupportOpen(true)} 
+              className="help-btn"
+              style={{ cursor: 'pointer', textAlign: 'center', width: '100%', border: 'none' }}
+            >
               Soporte Kônsul
-            </a>
+            </button>
           </div>
         )}
 
@@ -269,6 +305,161 @@ export default function Sidebar({ user, isLocked = false }: SidebarProps) {
           {!isCollapsed && <span className="logout-text">Cerrar Sesión</span>}
         </LogoutLink>
       </div>
+
+      {/* Support Request Modal */}
+      {isSupportOpen && (
+        <div className="support-modal-overlay" onClick={closeSupportModal}>
+          <div className="support-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="support-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div className="support-modal-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                  </svg>
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-heading)' }}>Soporte Kônsul</h3>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>¿En qué podemos ayudarte hoy?</p>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={closeSupportModal} 
+                className="support-modal-close"
+                aria-label="Cerrar modal"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            {supportSuccess ? (
+              <div className="support-modal-success">
+                <div className="support-success-icon">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#00a884" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                  </svg>
+                </div>
+                <h4 style={{ margin: '0.5rem 0', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>¡Solicitud enviada con éxito!</h4>
+                <p style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5, marginBottom: '1.5rem' }}>
+                  Hemos recibido tu mensaje. Nuestro equipo de soporte Kônsul se pondrá en contacto contigo a <strong>{supportEmail || user?.email}</strong> a la mayor brevedad posible.
+                </p>
+                <button type="button" onClick={closeSupportModal} className="btn-brand-teal" style={{ width: '100%', justifyContent: 'center' }}>
+                  Entendido
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSendSupport} className="support-modal-form">
+                <div className="input-group-full" style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                    Tu Correo Electrónico
+                  </label>
+                  <input 
+                    type="email" 
+                    value={supportEmail}
+                    onChange={(e) => setSupportEmail(e.target.value)}
+                    required
+                    placeholder="tu@correo.com"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '12px',
+                      border: '1.5px solid var(--border-color)',
+                      background: '#ffffff',
+                      color: 'var(--text-heading)',
+                      fontWeight: 600,
+                      fontSize: '0.9rem'
+                    }}
+                  />
+                </div>
+
+                <div className="input-group-full" style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                    Motivo o Área de Consulta
+                  </label>
+                  <select
+                    value={supportCategory}
+                    onChange={(e) => setSupportCategory(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '12px',
+                      border: '1.5px solid var(--border-color)',
+                      background: '#ffffff',
+                      color: 'var(--text-heading)',
+                      fontWeight: 600,
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    <option value="Consulta General">Consulta General</option>
+                    <option value="Automatizaciones & Conexiones">Automatizaciones & Conexiones</option>
+                    <option value="Problema con Kônsul Bills">Problema con Kônsul Bills</option>
+                    <option value="Problema con Kônsul Process">Problema con Kônsul Process</option>
+                    <option value="Problema con Kônsul Mailing">Problema con Kônsul Mailing</option>
+                    <option value="Facturación, Pagos y Planes">Facturación, Pagos y Planes</option>
+                    <option value="Solicitud de Nueva Función">Solicitud de Nueva Función</option>
+                  </select>
+                </div>
+
+                <div className="input-group-full" style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                    Describe detalladamente tu consulta
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={supportMessage}
+                    onChange={(e) => setSupportMessage(e.target.value)}
+                    placeholder="Explícanos lo que sucede o en qué podemos asistirte..."
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '0.85rem 1rem',
+                      borderRadius: '12px',
+                      border: '1.5px solid var(--border-color)',
+                      fontFamily: 'inherit',
+                      fontSize: '0.9rem',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                  <button 
+                    type="button" 
+                    onClick={closeSupportModal}
+                    className="btn-step-cancel"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={isSubmittingSupport}
+                    className="btn-brand-teal"
+                    style={{ minWidth: '140px', justifyContent: 'center' }}
+                  >
+                    {isSubmittingSupport ? (
+                      <>
+                        <svg className="spin-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+                        <span>Enviando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        <span>Enviar Solicitud</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
     </aside>
   );
