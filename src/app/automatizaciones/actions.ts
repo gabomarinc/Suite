@@ -241,7 +241,30 @@ export async function fetchProcessTemplates(serviceKey: string) {
     }
 
     const data = await res.json();
-    return { success: true, data: data.data || [] };
+    const rawTemplates = data.data || [];
+    
+    // Ensure every template has execution variables including Document attachment
+    const enrichedTemplates = rawTemplates.map((t: any) => {
+      const vars = Array.isArray(t.variables) ? [...t.variables] : [];
+      if (!vars.includes('Cliente / Nombre de la Ejecución')) {
+        vars.push('Cliente / Nombre de la Ejecución');
+      }
+      if (!vars.includes('Documento Adjunto (URL)')) {
+        vars.push('Documento Adjunto (URL)');
+      }
+      if (!vars.includes('Fecha de Inicio')) {
+        vars.push('Fecha de Inicio');
+      }
+      if (!vars.includes('Notas / Resumen')) {
+        vars.push('Notas / Resumen');
+      }
+      return {
+        ...t,
+        variables: vars
+      };
+    });
+
+    return { success: true, data: enrichedTemplates };
   } catch (error) {
     console.error("Error fetching templates:", error);
     return { success: false, error: 'Error de red o CORS al contactar Process' };

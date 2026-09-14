@@ -277,24 +277,52 @@ export default function IntegrationCard({
     if (rule.sourceApp === 'bills') {
       if (trigName === 'Nuevo Cliente o Prospecto') {
         mockData = {
+          'ID del Cliente': 'cli_manual_99',
           'Nombre del Cliente': 'Cliente de Prueba Manual',
           'Email del Cliente': 'test-manual@suite.com',
           'Teléfono': '+507 6000-1111',
+          'RUC / Cédula': '8-765-4321',
+          'Dirección': 'Obarrio, Calle 50, Ciudad de Panamá',
+          'Notas': 'Cliente prospecto con alta intención de compra',
           'Fecha de Creación': new Date().toISOString()
         };
       } else {
         mockData = {
+          'ID de Factura / Documento': 'FAC-2026-0042',
+          'Tipo de Documento': 'Factura',
           'Nombre del Cliente': 'Cliente Manual Factura S.A.',
           'Email del Cliente': 'cliente-factura-manual@suite.com',
+          'Teléfono del Cliente': '+507 6234-5678',
+          'RUC / Cédula del Cliente': '1557890-1-654321 DV 89',
+          'Dirección del Cliente': 'Costa del Este, Torre Financial Park, Piso 14',
           'Monto Total': '850.00',
-          'Concepto de Venta': 'Servicio Técnico de Servidores',
-          'Fecha de Creación': new Date().toISOString()
+          'Moneda': 'USD',
+          'Concepto de Venta': 'Servicio Técnico de Servidores y Cloud',
+          'Estado de Factura': 'Creada',
+          'Fecha de Creación': new Date().toISOString(),
+          'Fecha de Vencimiento': new Date(Date.now() + 15 * 86400000).toISOString(),
+          'Notas del Documento': 'Términos de pago: 15 días calendario.',
+          'Documento Adjunto (URL / PDF)': 'https://bills.konsul.digital/api/v1/invoices?id=FAC-2026-0042',
+          'Enlace de Factura en Bills': 'https://bills.konsul.digital?invoiceId=FAC-2026-0042'
         };
       }
+    } else if (rule.sourceApp === 'reactivaleads') {
+      mockData = {
+        'ID del Lead': 'lead_auto_101',
+        'Nombre del Lead': 'Carlos Rodríguez',
+        'Email del Lead': 'carlos.rodriguez@empresa.com',
+        'Teléfono del Lead': '+507 6555-8888',
+        'Empresa / Organización': 'Logística Global S.A.',
+        'Origen / Canal': 'Campaña Meta Ads Q3',
+        'Puntaje de Scoring': '95',
+        'Notas / Mensaje': 'Solicita integración con su sistema contable'
+      };
     } else {
       mockData = {
+        'ID de Tarea': 'task_manual_88',
         'Título de Tarea': 'Tarea de Prueba Automatizada',
         'Descripción': 'Creada mediante el botón Probar de la Suite',
+        'Documento Adjunto (URL)': 'https://bills.konsul.digital/api/v1/invoices?id=FAC-2026-0042',
         'Fecha de Creación': new Date().toISOString()
       };
     }

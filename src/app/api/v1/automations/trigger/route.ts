@@ -75,6 +75,25 @@ export async function POST(req: Request) {
       const mappings = (rule.mappings as Record<string, string>) || {};
       const mappingTypes = (rule.mappingTypes as Record<string, 'field' | 'static'>) || {};
 
+      // Enrich data with cross-app aliases and document attachments
+      const docId = data['id'] || data['ID de Factura / Documento'] || data['invoiceId'] || data['docId'] || '';
+      const enrichedData: Record<string, any> = { ...data };
+
+      if (appCode === 'bills') {
+        const docUrl = data['Documento Adjunto (URL / PDF)'] 
+          || data['Documento Adjunto (URL)'] 
+          || data['Documento Adjunto'] 
+          || data['receiptUrl'] 
+          || data['receipt_url'] 
+          || (docId ? `https://bills.konsul.digital/api/v1/invoices?id=${docId}` : '');
+
+        enrichedData['ID de Factura / Documento'] = enrichedData['ID de Factura / Documento'] || docId;
+        enrichedData['Documento Adjunto (URL / PDF)'] = docUrl;
+        enrichedData['Documento Adjunto (URL)'] = docUrl;
+        enrichedData['Documento Adjunto'] = docUrl;
+        enrichedData['Enlace de Factura en Bills'] = enrichedData['Enlace de Factura en Bills'] || (docId ? `https://bills.konsul.digital?invoiceId=${docId}` : '');
+      }
+
       // Resolve payload
       const resolvedVariables: Record<string, string> = {};
       for (const [field, targetVal] of Object.entries(mappings)) {
@@ -82,7 +101,25 @@ export async function POST(req: Request) {
         
         const type = mappingTypes[field] || 'field';
         if (type === 'field') {
-          resolvedVariables[field] = data[targetVal] || '';
+          let val = enrichedData[targetVal];
+          
+          // Smart alias resolution if not found under exact key
+          if (val === undefined || val === '') {
+            const lowerTarget = targetVal.toLowerCase();
+            if (lowerTarget.includes('documento') || lowerTarget.includes('adjunto') || lowerTarget.includes('url') || lowerTarget.includes('pdf')) {
+              val = enrichedData['Documento Adjunto (URL / PDF)'] || enrichedData['Documento Adjunto (URL)'] || enrichedData['Documento Adjunto'] || enrichedData['receiptUrl'] || enrichedData['Enlace de Factura en Bills'];
+            } else if (lowerTarget.includes('cliente') && lowerTarget.includes('nombre')) {
+              val = enrichedData['Nombre del Cliente'] || enrichedData['clientName'] || enrichedData['name'];
+            } else if (lowerTarget.includes('email') || lowerTarget.includes('correo')) {
+              val = enrichedData['Email del Cliente'] || enrichedData['clientEmail'] || enrichedData['email'];
+            } else if (lowerTarget.includes('total') || lowerTarget.includes('monto')) {
+              val = enrichedData['Monto Total'] || enrichedData['total'] || enrichedData['amount'];
+            } else if (lowerTarget.includes('concepto') || lowerTarget.includes('descrip')) {
+              val = enrichedData['Concepto de Venta'] || enrichedData['concept'] || enrichedData['description'];
+            }
+          }
+
+          resolvedVariables[field] = val !== undefined && val !== null ? String(val) : '';
         } else {
           resolvedVariables[field] = targetVal || '';
         }
