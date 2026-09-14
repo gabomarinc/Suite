@@ -297,9 +297,9 @@ export const ALL_APPS: Record<string, AppConfig> = {
       }
     ]
   },
-  reactivaleads: {
+  leadshub: {
     name: 'Kônsul LeadsHUB',
-    code: 'reactivaleads',
+    code: 'leadshub',
     triggers: [
       { 
         name: 'Nuevo Lead Registrado (Chat / Form)', 
@@ -500,21 +500,42 @@ export const ALL_APPS: Record<string, AppConfig> = {
         fields: ['Email del Suscriptor', 'Nombre del Suscriptor', 'Lista'] 
       }
     ]
+  },
+  reactivaleads: {
+    name: 'Kônsul Reactivaleads',
+    code: 'reactivaleads',
+    triggers: [
+      { 
+        name: 'Nuevo Lead Registrado', 
+        description: 'Se dispara al capturar un lead de formulario o chat.', 
+        outputs: ['Nombre del Lead', 'Email del Lead', 'Teléfono del Lead'] 
+      },
+      { 
+        name: 'Lead Calificado', 
+        description: 'Se dispara al alcanzar un score crediticio o comercial mínimo.', 
+        outputs: ['Nombre del Lead', 'Email del Lead', 'Puntaje de Scoring'] 
+      }
+    ],
+    actions: [
+      { 
+        name: 'Crear o Importar Lead', 
+        description: 'Inserta un nuevo prospecto en la base de datos central.', 
+        fields: ['Nombre del Lead', 'Email del Lead', 'Teléfono del Lead'] 
+      },
+      { 
+        name: 'Asignar Agente', 
+        description: 'Asigna un prospecto a un asesor.', 
+        fields: ['Email del Asesor/Agente'] 
+      }
+    ]
   }
-};
-
-// Aliasing leadshub to reactivaleads for complete backwards/forwards compatibility
-ALL_APPS.leadshub = {
-  ...ALL_APPS.reactivaleads,
-  code: 'leadshub',
-  name: 'Kônsul LeadsHUB'
 };
 
 export const APP_NAMES_MAP: Record<string, string> = {
   bills: 'Kônsul Bills',
   process: 'Kônsul Process',
   leadshub: 'Kônsul LeadsHUB',
-  reactivaleads: 'Kônsul LeadsHUB',
+  reactivaleads: 'Kônsul Reactivaleads',
   kredit: 'Kônsul Kredit',
   mailing: 'Kônsul Mailing'
 };

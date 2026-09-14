@@ -628,15 +628,13 @@ export async function POST(req: Request) {
           });
           executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });
         }
-      } else if (targetApp === 'reactivaleads' || targetApp === 'leadshub') {
-        const appCfg = ALL_APPS[targetApp] || ALL_APPS.reactivaleads;
+      } else if (targetApp === 'leadshub') {
+        const appCfg = ALL_APPS.leadshub;
         const actionConfig = appCfg?.actions[rule.actionIdx];
         const actionName = actionConfig?.name || 'Acción en LeadsHUB';
         const leadshubUrl = process.env.LEADSHUB_URL 
-          || process.env.REACTIVALEADS_URL 
           || process.env.NEXT_PUBLIC_LEADSHUB_URL 
-          || process.env.NEXT_PUBLIC_REACTIVALEADS_URL 
-          || 'https://reactivaleads.konsul.digital';
+          || 'https://agentes.konsul.digital';
 
         // Select endpoint and formatted payload according to action
         let endpoint = `${leadshubUrl}/api/v1/contacts`;
@@ -783,6 +781,66 @@ export async function POST(req: Request) {
               status: 'FAILED',
               errorDetails: fetchErr.message || 'Error de conexión con LeadsHUB',
               payloadSent: requestBody,
+              responseRec: Prisma.DbNull
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });
+        }
+      } else if (targetApp === 'reactivaleads') {
+        const appCfg = ALL_APPS.reactivaleads;
+        const actionConfig = appCfg?.actions[rule.actionIdx];
+        const actionName = actionConfig?.name || 'Acción en Reactivaleads';
+        const reactivaleadsUrl = process.env.REACTIVALEADS_URL 
+          || process.env.NEXT_PUBLIC_REACTIVALEADS_URL 
+          || 'https://reactivaleads.konsul.digital';
+
+        try {
+          const response = await fetch(`${reactivaleadsUrl}/api/v1/leads`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': targetIntegration.serviceKey || sharedSecret,
+              'x-user-id': rule.userId,
+              'x-user-email': userEmail,
+              'x-user-name': userName
+            },
+            body: JSON.stringify({
+              action: actionName,
+              variables: resolvedVariables
+            })
+          });
+
+          let resData: any = {};
+          try { resData = await response.json(); } catch (e) { resData = { message: 'OK' }; }
+          const isSuccess = response.ok;
+
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName,
+              status: isSuccess ? 'SUCCESS' : 'FAILED',
+              errorDetails: isSuccess ? null : (resData.error || 'Error al procesar acción en Reactivaleads'),
+              payloadSent: resolvedVariables,
+              responseRec: resData
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: isSuccess ? 'SUCCESS' : 'FAILED', logId: log.id });
+        } catch (fetchErr: any) {
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName,
+              status: 'FAILED',
+              errorDetails: fetchErr.message || 'Error de conexión con Reactivaleads',
+              payloadSent: resolvedVariables,
               responseRec: Prisma.DbNull
             }
           });

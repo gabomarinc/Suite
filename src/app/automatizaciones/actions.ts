@@ -199,8 +199,10 @@ export async function testIntegration(appCode: string, serviceKey: string) {
       } else {
         logs.push(`[GET] /api/v1/summary -> Respuesta HTTP: ${res.status}`);
       }
-    } else if (appCode === 'reactivaleads' || appCode === 'leadshub') {
-      logs.push(`LeadsHUB API v1 conectada y lista para sincronizar leads CRM, agentes IA y mensajería WhatsApp.`);
+    } else if (appCode === 'leadshub') {
+      logs.push(`LeadsHUB (https://agentes.konsul.digital) API v1 conectada y lista para sincronizar contactos, agentes IA y mensajería WhatsApp.`);
+    } else if (appCode === 'reactivaleads') {
+      logs.push(`Reactivaleads (https://reactivaleads.konsul.digital) API v1 conectada y lista para sincronizar prospectos.`);
     } else if (appCode === 'kredit') {
       logs.push(`Kredit API v1 operativa y lista para procesar evaluaciones y solicitudes de riesgo.`);
     }
@@ -644,12 +646,10 @@ export async function retryAutomationLog(logId: string) {
     } catch (fetchErr: any) {
       return { success: false, error: fetchErr.message || 'Error de red con Bills' };
     }
-  } else if (log.targetApp === 'reactivaleads' || log.targetApp === 'leadshub') {
+  } else if (log.targetApp === 'leadshub') {
     const leadshubUrl = process.env.LEADSHUB_URL 
-      || process.env.REACTIVALEADS_URL 
       || process.env.NEXT_PUBLIC_LEADSHUB_URL 
-      || process.env.NEXT_PUBLIC_REACTIVALEADS_URL 
-      || 'https://reactivaleads.konsul.digital';
+      || 'https://agentes.konsul.digital';
 
     const actionName = log.actionName || '';
     let endpoint = `${leadshubUrl}/api/v1/contacts`;
