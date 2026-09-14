@@ -64,9 +64,10 @@ export default function IntegrationCard({
   // Progressive Step-by-Step Flow Wizard State (1: Trigger, 2: Target & Action, 3: Mapping)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
 
-  // Automation Builder State
+  // Automation Builder State - Default to process, bills, or mailing
+  const defaultTarget = app.code === 'process' ? 'bills' : app.code === 'bills' ? 'process' : 'mailing';
   const [selectedTriggerIdx, setSelectedTriggerIdx] = useState(0);
-  const [targetApp, setTargetApp] = useState<string>('process');
+  const [targetApp, setTargetApp] = useState<string>(defaultTarget);
   const [selectedActionIdx, setSelectedActionIdx] = useState(0);
   
   // Dynamic Process Templates State
@@ -102,17 +103,12 @@ export default function IntegrationCard({
     return () => window.removeEventListener('konsul_integrations_updated', fetchIntegrations);
   }, []);
 
-  // Update default targetApp when integrations are loaded or updated
+  // Ensure targetApp is valid
   useEffect(() => {
-    const active = connectedIntegrations.filter(i => i.isActive && i.serviceKey);
-    if (active.length > 0) {
-      if (!targetApp || !active.some(a => a.appCode === targetApp)) {
-        setTargetApp(active[0].appCode);
-      }
-    } else {
-      setTargetApp('');
+    if (!targetApp) {
+      setTargetApp(defaultTarget);
     }
-  }, [connectedIntegrations, targetApp]);
+  }, [targetApp, defaultTarget]);
 
   // Sync rules across cards
   useEffect(() => {
@@ -137,13 +133,12 @@ export default function IntegrationCard({
       setIsLoadingTemplates(true);
       fetchProcessTemplates(targetServiceKey)
         .then(res => {
-          if (res.success) {
+          if (res.success && res.data && res.data.length > 0) {
             setProcessTemplates(res.data);
-            if (res.data.length > 0 && !selectedTemplateId) {
+            if (!selectedTemplateId) {
               setSelectedTemplateId(res.data[0].id);
             }
           } else {
-            console.error(res.error);
             setProcessTemplates([]);
           }
         })
@@ -157,7 +152,7 @@ export default function IntegrationCard({
     } else {
       setProcessTemplates([]);
     }
-  }, [targetApp, connectedIntegrations, isExpanded]);
+  }, [targetApp, connectedIntegrations, isExpanded, selectedTemplateId]);
 
   const handleToggle = async () => {
     try {
@@ -167,6 +162,16 @@ export default function IntegrationCard({
     } catch (e) {
       console.error(e);
     }
+  };
+
+  // Reset and exit builder flow completely
+  const handleCancelBuilder = () => {
+    setCurrentStep(1);
+    setMappingValues({});
+    setMappingTypes({});
+    setSelectedTriggerIdx(0);
+    setSelectedActionIdx(0);
+    setActiveTab('rules');
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -226,7 +231,8 @@ export default function IntegrationCard({
 
   const handleAddRule = async (e: React.FormEvent) => {
     e.preventDefault();
-    const actionFields = targetApp === 'process'
+    const isProcessWithTemplates = targetApp === 'process' && processTemplates.length > 0;
+    const actionFields = isProcessWithTemplates
       ? (processTemplates.find(t => t.id === selectedTemplateId)?.variables || []).filter((v: string) => v !== 'Miembro Involucrado (Email)')
       : (targetAppConfig.actions[selectedActionIdx]?.fields || []);
     
@@ -239,7 +245,7 @@ export default function IntegrationCard({
       finalTypes[field] = mappingTypes[field] || 'static';
     });
 
-    if (targetApp === 'process' && selectedTemplateId) {
+    if (isProcessWithTemplates && selectedTemplateId) {
       finalMappings['__templateId'] = selectedTemplateId;
       finalTypes['__templateId'] = 'static';
     }
@@ -380,16 +386,24 @@ export default function IntegrationCard({
   };
 
   const currentAppRules = rules.filter(r => r.sourceApp === app.code || r.targetApp === app.code);
-  const activeConnectedTargetApps = connectedIntegrations.filter(i => i.isActive && i.serviceKey);
-  const hasActiveTargetApps = activeConnectedTargetApps.length > 0;
   const isConnected = !!serviceKey && isActive;
+
+  // Destination apps: Bills, Process, and Mailing are ALWAYS available as targets for all apps
+  const DESTINATION_ORDER = ['bills', 'process', 'mailing', 'reactivaleads', 'kredit'];
+  const availableTargetApps = DESTINATION_ORDER
+    .map(code => ALL_APPS[code])
+    .filter(Boolean);
+
+  const targetIntegration = connectedIntegrations.find(i => i.appCode === targetApp);
+  const isTargetIntegrated = !!(targetIntegration?.isActive && targetIntegration?.serviceKey);
 
   // Selected trigger metadata
   const currentTrigger = currentAppConfig.triggers[selectedTriggerIdx] || { name: 'Disparador', outputs: [] };
   
   // Selected action metadata
   const currentTargetAppName = ALL_APPS[targetApp]?.name || targetApp;
-  const currentActionName = targetApp === 'process'
+  const isProcessWithTemplates = targetApp === 'process' && processTemplates.length > 0;
+  const currentActionName = isProcessWithTemplates
     ? (processTemplates.find(t => t.id === selectedTemplateId)?.name || 'Plantilla de Proceso')
     : (targetAppConfig.actions[selectedActionIdx]?.name || 'Acción');
 
@@ -476,7 +490,7 @@ export default function IntegrationCard({
       {isExpanded && (
         <div className="app-accordion-drawer">
           
-          {/* Tabs Bar with clean universal SVG icons (no emojis) */}
+          {/* Tabs Bar with clean universal SVG icons */}
           <div className="accordion-tabs-bar">
             <button 
               type="button" 
@@ -520,47 +534,65 @@ export default function IntegrationCard({
           {/* TAB 1: PROGRESSIVE STEP-BY-STEP FLOW BUILDER */}
           {activeTab === 'builder' && (
             <div className="flow-canvas-container">
-              {/* Stepper Navigation Indicator */}
-              <div className="flow-stepper-nav">
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep(1)}
-                  className={`flow-step-nav-item ${currentStep === 1 ? 'active' : 'completed'}`}
-                >
-                  <div className="flow-step-nav-num">
-                    {currentStep > 1 ? (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                    ) : '1'}
+              
+              {/* Stepper Navigation Indicator with Limpiar y Salir Button */}
+              <div className="flow-stepper-nav" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, overflowX: 'auto' }}>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep(1)}
+                    className={`flow-step-nav-item ${currentStep === 1 ? 'active' : 'completed'}`}
+                  >
+                    <div className="flow-step-nav-num">
+                      {currentStep > 1 ? (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      ) : '1'}
+                    </div>
+                    <span>1. Disparador</span>
+                  </button>
+
+                  <div className={`flow-step-nav-divider ${currentStep > 1 ? 'active' : ''}`}></div>
+
+                  <button
+                    type="button"
+                    onClick={() => currentStep > 2 && setCurrentStep(2)}
+                    className={`flow-step-nav-item ${currentStep === 2 ? 'active' : currentStep > 2 ? 'completed' : ''}`}
+                    disabled={currentStep < 2}
+                    style={{ cursor: currentStep >= 2 ? 'pointer' : 'default', opacity: currentStep < 2 ? 0.6 : 1 }}
+                  >
+                    <div className="flow-step-nav-num">
+                      {currentStep > 2 ? (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      ) : '2'}
+                    </div>
+                    <span>2. Destino y Acción</span>
+                  </button>
+
+                  <div className={`flow-step-nav-divider ${currentStep > 2 ? 'active' : ''}`}></div>
+
+                  <div 
+                    className={`flow-step-nav-item ${currentStep === 3 ? 'active' : ''}`}
+                    style={{ opacity: currentStep < 3 ? 0.6 : 1 }}
+                  >
+                    <div className="flow-step-nav-num">3</div>
+                    <span>3. Mapeo de Variables</span>
                   </div>
-                  <span>1. Disparador</span>
-                </button>
-
-                <div className={`flow-step-nav-divider ${currentStep > 1 ? 'active' : ''}`}></div>
-
-                <button
-                  type="button"
-                  onClick={() => currentStep > 2 && setCurrentStep(2)}
-                  className={`flow-step-nav-item ${currentStep === 2 ? 'active' : currentStep > 2 ? 'completed' : ''}`}
-                  disabled={currentStep < 2}
-                  style={{ cursor: currentStep >= 2 ? 'pointer' : 'default', opacity: currentStep < 2 ? 0.6 : 1 }}
-                >
-                  <div className="flow-step-nav-num">
-                    {currentStep > 2 ? (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                    ) : '2'}
-                  </div>
-                  <span>2. Destino y Acción</span>
-                </button>
-
-                <div className={`flow-step-nav-divider ${currentStep > 2 ? 'active' : ''}`}></div>
-
-                <div 
-                  className={`flow-step-nav-item ${currentStep === 3 ? 'active' : ''}`}
-                  style={{ opacity: currentStep < 3 ? 0.6 : 1 }}
-                >
-                  <div className="flow-step-nav-num">3</div>
-                  <span>3. Mapeo de Variables</span>
                 </div>
+
+                {/* Reset & Exit Button */}
+                <button
+                  type="button"
+                  onClick={handleCancelBuilder}
+                  className="btn-flow-cancel"
+                  title="Limpiar y salir del flujo"
+                  style={{ marginLeft: '1rem', flexShrink: 0 }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                  <span>Limpiar y Salir</span>
+                </button>
               </div>
 
               {/* Wizard Steps Container */}
@@ -581,7 +613,7 @@ export default function IntegrationCard({
                           Paso 1: Disparador — {currentTrigger.name}
                         </div>
                         <div className="flow-step-collapsed-meta">
-                          {app.name} • {currentTrigger.outputs.length} variables disponibles
+                          {app.name} • {currentTrigger.outputs.length} variables de base de datos disponibles
                         </div>
                       </div>
                     </div>
@@ -641,7 +673,7 @@ export default function IntegrationCard({
                     {/* Outputs Preview */}
                     <div style={{ marginTop: '1.25rem' }}>
                       <span style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                        VARIABLES QUE SE EMITIRÁN AL DISPARAR:
+                        VARIABLES DISPONIBLES DE BASE DE DATOS ({currentTrigger.outputs.length}):
                       </span>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
                         {currentTrigger.outputs.map((out: string) => (
@@ -664,14 +696,23 @@ export default function IntegrationCard({
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setCurrentStep(2)}
-                      className="btn-step-next"
-                    >
-                      <span>Continuar al Paso 2 (Destino)</span>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                    </button>
+                    <div className="step-actions-row">
+                      <button
+                        type="button"
+                        onClick={() => setCurrentStep(2)}
+                        className="btn-step-next"
+                      >
+                        <span>Continuar al Paso 2 (Destino)</span>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelBuilder}
+                        className="btn-step-cancel"
+                      >
+                        Cancelar y Salir
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -716,21 +757,56 @@ export default function IntegrationCard({
                         <span className="flow-step-badge">Paso 2</span>
                         <div>
                           <div className="flow-step-title">Aplicación Destino y Acción</div>
-                          <div className="flow-step-desc">Elige dónde y cómo se ejecutarán los datos recibidos.</div>
+                          <div className="flow-step-desc">Elige dónde y qué acción se ejecutará cuando se dispare este evento.</div>
                         </div>
                       </div>
 
-                      {hasActiveTargetApps ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                          <div>
-                            <label style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.4rem', display: 'block' }}>
-                              APLICACIÓN DESTINO
-                            </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                        {/* Target App Selector: Bills, Process, and Mailing are always available */}
+                        <div>
+                          <label style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.4rem', display: 'block' }}>
+                            APLICACIÓN DESTINO
+                          </label>
+                          <select
+                            value={targetApp}
+                            onChange={(e) => {
+                              setTargetApp(e.target.value);
+                              setSelectedActionIdx(0);
+                              setMappingValues({});
+                              setMappingTypes({});
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 1rem',
+                              borderRadius: '12px',
+                              border: '1.5px solid #cbd5e1',
+                              background: '#ffffff',
+                              fontWeight: 700,
+                              fontSize: '0.9rem',
+                              color: '#0f172a'
+                            }}
+                          >
+                            {availableTargetApps.map(target => {
+                              const isTargetConnected = connectedIntegrations.some(i => i.appCode === target.code && i.isActive && i.serviceKey);
+                              return (
+                                <option key={target.code} value={target.code}>
+                                  {target.name} {isTargetConnected ? '✓' : ''}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+
+                        {/* Action Selector */}
+                        <div>
+                          <label style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.4rem', display: 'block' }}>
+                            ACCIÓN A EJECUTAR EN {currentTargetAppName.toUpperCase()}
+                          </label>
+                          {targetApp === 'process' && processTemplates.length > 0 ? (
                             <select
-                              value={targetApp}
+                              value={selectedTemplateId}
                               onChange={(e) => {
-                                setTargetApp(e.target.value);
-                                setSelectedActionIdx(0);
+                                setSelectedTemplateId(e.target.value);
                                 setMappingValues({});
                                 setMappingTypes({});
                               }}
@@ -740,105 +816,81 @@ export default function IntegrationCard({
                                 borderRadius: '12px',
                                 border: '1.5px solid #cbd5e1',
                                 background: '#ffffff',
-                                fontWeight: 700,
+                                fontWeight: 600,
                                 fontSize: '0.9rem',
                                 color: '#0f172a'
                               }}
                             >
-                              {activeConnectedTargetApps.map(i => (
-                                <option key={i.appCode} value={i.appCode}>
-                                  {ALL_APPS[i.appCode]?.name || i.appCode}
-                                </option>
+                              {isLoadingTemplates ? (
+                                <option>Cargando plantillas de tableros desde Process...</option>
+                              ) : (
+                                processTemplates.map(t => (
+                                  <option key={t.id} value={t.id}>Plantilla: {t.name}</option>
+                                ))
+                              )}
+                            </select>
+                          ) : (
+                            <select
+                              value={selectedActionIdx}
+                              onChange={(e) => {
+                                setSelectedActionIdx(parseInt(e.target.value));
+                                setMappingValues({});
+                                setMappingTypes({});
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '0.75rem 1rem',
+                                borderRadius: '12px',
+                                border: '1.5px solid #cbd5e1',
+                                background: '#ffffff',
+                                fontWeight: 600,
+                                fontSize: '0.9rem',
+                                color: '#0f172a'
+                              }}
+                            >
+                              {targetAppConfig.actions.map((act: any, idx: number) => (
+                                <option key={idx} value={idx}>{act.name}</option>
                               ))}
                             </select>
-                          </div>
+                          )}
+                        </div>
 
-                          <div>
-                            <label style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.4rem', display: 'block' }}>
-                              ACCIÓN A EJECUTAR
-                            </label>
-                            {targetApp === 'process' ? (
-                              <select
-                                value={selectedTemplateId}
-                                onChange={(e) => {
-                                  setSelectedTemplateId(e.target.value);
-                                  setMappingValues({});
-                                  setMappingTypes({});
-                                }}
-                                style={{
-                                  width: '100%',
-                                  padding: '0.75rem 1rem',
-                                  borderRadius: '12px',
-                                  border: '1.5px solid #cbd5e1',
-                                  background: '#ffffff',
-                                  fontWeight: 600,
-                                  fontSize: '0.9rem',
-                                  color: '#0f172a'
-                                }}
-                              >
-                                {isLoadingTemplates ? (
-                                  <option>Cargando plantillas de tableros desde Process...</option>
-                                ) : processTemplates.length === 0 ? (
-                                  <option>Sin plantillas disponibles en Process</option>
-                                ) : (
-                                  processTemplates.map(t => (
-                                    <option key={t.id} value={t.id}>{t.name}</option>
-                                  ))
-                                )}
-                              </select>
-                            ) : (
-                              <select
-                                value={selectedActionIdx}
-                                onChange={(e) => {
-                                  setSelectedActionIdx(parseInt(e.target.value));
-                                  setMappingValues({});
-                                  setMappingTypes({});
-                                }}
-                                style={{
-                                  width: '100%',
-                                  padding: '0.75rem 1rem',
-                                  borderRadius: '12px',
-                                  border: '1.5px solid #cbd5e1',
-                                  background: '#ffffff',
-                                  fontWeight: 600,
-                                  fontSize: '0.9rem',
-                                  color: '#0f172a'
-                                }}
-                              >
-                                {targetAppConfig.actions.map((act: any, idx: number) => (
-                                  <option key={idx} value={idx}>{act.name}</option>
-                                ))}
-                              </select>
-                            )}
+                        {/* Soft Connection Notice */}
+                        {!isTargetIntegrated && (
+                          <div style={{
+                            fontSize: '0.8rem',
+                            color: '#0d9488',
+                            background: '#f0fdfa',
+                            padding: '0.65rem 0.85rem',
+                            borderRadius: '10px',
+                            border: '1px solid #ccfbf1',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                          }}>
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            <span>Puedes configurar esta regla ahora mismo. Recuerda guardar el Service Key de <strong>{currentTargetAppName}</strong> en la pestaña Credenciales para que opere en vivo.</span>
                           </div>
+                        )}
 
+                        <div className="step-actions-row">
                           <button
                             type="button"
                             onClick={() => setCurrentStep(3)}
-                            disabled={!hasActiveTargetApps || (targetApp === 'process' && !selectedTemplateId && !isLoadingTemplates)}
                             className="btn-step-next"
                           >
                             <span>Continuar al Paso 3 (Variables)</span>
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                           </button>
+                          <button
+                            type="button"
+                            onClick={handleCancelBuilder}
+                            className="btn-step-cancel"
+                          >
+                            Cancelar y Salir
+                          </button>
                         </div>
-                      ) : (
-                        <div style={{
-                          padding: '1.25rem',
-                          background: '#fff7ed',
-                          border: '1px solid #fed7aa',
-                          borderRadius: '12px',
-                          color: '#c2410c',
-                          fontSize: '0.85rem',
-                          fontWeight: 600,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.75rem'
-                        }}>
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                          <span>Conecta y activa otra aplicación de la lista para poder recibir datos de este disparador.</span>
-                        </div>
-                      )}
+                      </div>
                     </div>
                   )
                 )}
@@ -859,7 +911,8 @@ export default function IntegrationCard({
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                       {(() => {
-                        const activeFields = targetApp === 'process'
+                        const isProcessWithTemplates = targetApp === 'process' && processTemplates.length > 0;
+                        const activeFields = isProcessWithTemplates
                           ? (processTemplates.find(t => t.id === selectedTemplateId)?.variables || []).filter((v: string) => v !== 'Miembro Involucrado (Email)')
                           : (targetAppConfig.actions[selectedActionIdx]?.fields || []);
                           
@@ -872,7 +925,7 @@ export default function IntegrationCard({
                         }
 
                         return activeFields.map((field: string) => {
-                          const mType = mappingTypes[field] || 'static';
+                          const mType = mappingTypes[field] || 'field';
                           const availOutputs = currentTrigger.outputs || [];
                           
                           return (
@@ -952,22 +1005,31 @@ export default function IntegrationCard({
                       })()}
                     </div>
 
-                    <button 
-                      type="submit" 
-                      className="btn-step-next"
-                      style={{ 
-                        width: '100%', 
-                        background: 'linear-gradient(135deg, #00a884 0%, #0d9488 100%)',
-                        padding: '0.85rem',
-                        fontSize: '0.9rem',
-                        boxShadow: '0 4px 15px rgba(0, 168, 132, 0.3)'
-                      }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                      </svg>
-                      <span>Guardar y Activar Automatización</span>
-                    </button>
+                    <div className="step-actions-row">
+                      <button 
+                        type="submit" 
+                        className="btn-step-next"
+                        style={{ 
+                          flex: 1,
+                          background: 'linear-gradient(135deg, #00a884 0%, #0d9488 100%)',
+                          padding: '0.85rem',
+                          fontSize: '0.9rem',
+                          boxShadow: '0 4px 15px rgba(0, 168, 132, 0.3)'
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        <span>Guardar y Activar Automatización</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelBuilder}
+                        className="btn-step-cancel"
+                      >
+                        Cancelar y Salir
+                      </button>
+                    </div>
                   </div>
                 )}
 
