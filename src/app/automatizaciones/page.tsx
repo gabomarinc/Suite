@@ -233,7 +233,7 @@ export default async function AutomatizacionesPage() {
               initialServiceKey={serviceKey}
               initialRules={dbRules}
               userEmail={kindeUser.email || ''}
-              userName={kindeUser.given_name || kindeUser.name || ''}
+              userName={kindeUser.given_name || (kindeUser as any).name || ''}
             />
           );
         })}
