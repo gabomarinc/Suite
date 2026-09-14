@@ -131,23 +131,23 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
             onClick={() => setPricingCategory('suite')}
             style={{
               background: '#ffffff',
-              border: pricingCategory === 'suite' ? '2.5px solid #6366f1' : '1px solid #e2e8f0',
-              borderRadius: '12px',
-              padding: '1.5rem',
+              border: pricingCategory === 'suite' ? '2.5px solid #00a884' : '1px solid #e2e8f0',
+              borderRadius: '16px',
+              padding: '1.75rem',
               cursor: 'pointer',
-              boxShadow: pricingCategory === 'suite' ? '0 10px 15px -3px rgba(99, 102, 241, 0.1)' : 'none',
+              boxShadow: pricingCategory === 'suite' ? '0 10px 20px -3px rgba(0, 168, 132, 0.15)' : 'none',
               transition: 'all 0.2s',
               textAlign: 'left'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: pricingCategory === 'suite' ? '#6366f1' : '#64748b' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: pricingCategory === 'suite' ? '#00a884' : '#64748b' }}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect width="20" height="14" x="2" y="7" rx="2" ry="2"/>
                   <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
                 </svg>
               </span>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Planes de la Suite</h3>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Planes de la Suite</h3>
             </div>
             <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>
               Acceso completo a la suite principal de herramientas unificadas (Bills, Process, Kredit, Mailing) excepto LeadsHUB.
@@ -159,17 +159,17 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
             onClick={() => setPricingCategory('leads')}
             style={{
               background: '#ffffff',
-              border: pricingCategory === 'leads' ? '2.5px solid #6366f1' : '1px solid #e2e8f0',
-              borderRadius: '12px',
-              padding: '1.5rem',
+              border: pricingCategory === 'leads' ? '2.5px solid #00a884' : '1px solid #e2e8f0',
+              borderRadius: '16px',
+              padding: '1.75rem',
               cursor: 'pointer',
-              boxShadow: pricingCategory === 'leads' ? '0 10px 15px -3px rgba(99, 102, 241, 0.1)' : 'none',
+              boxShadow: pricingCategory === 'leads' ? '0 10px 20px -3px rgba(0, 168, 132, 0.15)' : 'none',
               transition: 'all 0.2s',
               textAlign: 'left'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: pricingCategory === 'leads' ? '#6366f1' : '#64748b' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: pricingCategory === 'leads' ? '#00a884' : '#64748b' }}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
                   <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
@@ -177,7 +177,7 @@ export default function PricingClient({ isAuthenticated, currentPlan }: PricingC
                   <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
                 </svg>
               </span>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Planes Suite + LeadsHUB</h3>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Planes Suite + LeadsHUB</h3>
             </div>
             <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, lineHeight: 1.4 }}>
               El paquete definitivo. Integra toda la Suite y desbloquea LeadsHUB para captar y automatizar leads.

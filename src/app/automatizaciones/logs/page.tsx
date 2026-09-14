@@ -100,81 +100,87 @@ export default function AutomationLogsPage() {
 
   return (
     <main className="main-content integrations-hub-wrapper">
-      {/* Breadcrumbs & Header */}
-      <div className="settings-header-container">
-        <div className="settings-breadcrumbs">
-          <Link href="/automatizaciones" style={{ color: '#64748b', textDecoration: 'none' }}>Inicio</Link>
-          <span className="separator">/</span>
-          <Link href="/automatizaciones" style={{ color: '#64748b', textDecoration: 'none' }}>Automatizaciones</Link>
-          <span className="separator">/</span>
-          <span className="active">Historial de Ejecuciones</span>
-        </div>
-        
-        <div className="settings-title-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h2>Historial de Ejecuciones</h2>
-            <p className="header-subtitle">Monitorea y depura en tiempo real los flujos de comunicación entre tus micro-SaaS.</p>
+      
+      {/* Dark Hero Card */}
+      <div className="dark-hero-card">
+        <div>
+          <div className="hero-tag-pill">
+            <div className="hero-tag-icon-box">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            </div>
+            <span>Monitoreo & Auditoría</span>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {logs.some(l => l.status === 'FAILED') && (
-              <button
-                onClick={handleRetryAllFailed}
-                style={{
-                  background: '#ef4444',
-                  color: '#ffffff',
-                  border: 'none',
-                  padding: '0.55rem 1rem',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  transition: 'all 0.2s'
-                }}
-              >
-                🔄 Re-procesar Fallidos
-              </button>
-            )}
-            <Link 
-              href="/automatizaciones" 
+          <h1>Historial de Ejecuciones</h1>
+          <p>Monitorea y depura en tiempo real los flujos de comunicación entre tus micro-SaaS.</p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          {logs.some(l => l.status === 'FAILED') && (
+            <button
+              onClick={handleRetryAllFailed}
               style={{
-                background: '#ffffff',
-                border: '1px solid #cbd5e1',
-                color: '#334155',
-                padding: '0.55rem 1rem',
-                borderRadius: '8px',
+                background: '#dc2626',
+                color: '#ffffff',
+                border: 'none',
+                padding: '0.75rem 1.4rem',
+                borderRadius: '12px',
                 fontSize: '0.85rem',
-                fontWeight: 600,
-                textDecoration: 'none',
-                transition: 'all 0.2s',
+                fontWeight: 800,
+                cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.5rem'
+                gap: '0.5rem',
+                boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)',
+                transition: 'all 0.2s',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase'
               }}
             >
-              ← Volver a Conexiones
-            </Link>
-          </div>
+              🔄 Re-procesar Fallidos
+            </button>
+          )}
+          <Link 
+            href="/automatizaciones" 
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              color: '#ffffff',
+              padding: '0.75rem 1.4rem',
+              borderRadius: '12px',
+              fontSize: '0.85rem',
+              fontWeight: 800,
+              textDecoration: 'none',
+              transition: 'all 0.2s',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase'
+            }}
+          >
+            ← Volver a Conexiones
+          </Link>
         </div>
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="card-premium" style={{ padding: '1rem 1.5rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Filtrar por Estado:</span>
+      {/* Filter Toolbar (Image 3 style segmented controls) */}
+      <div className="card-premium" style={{ padding: '1.25rem 1.75rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-light)', letterSpacing: '0.05em', textTransform: 'uppercase', marginRight: '0.5rem' }}>
+            Filtrar:
+          </span>
           <button 
             onClick={() => setFilterStatus('ALL')}
             style={{
-              padding: '0.4rem 0.8rem',
-              borderRadius: '6px',
+              padding: '0.45rem 1.1rem',
+              borderRadius: '100px',
               border: 'none',
-              fontSize: '0.8rem',
-              fontWeight: 600,
+              fontSize: '0.82rem',
+              fontWeight: 700,
               cursor: 'pointer',
-              background: filterStatus === 'ALL' ? '#3b82f6' : '#f1f5f9',
-              color: filterStatus === 'ALL' ? '#ffffff' : '#475569'
+              background: filterStatus === 'ALL' ? '#00a884' : '#f1f5f9',
+              color: filterStatus === 'ALL' ? '#ffffff' : '#64748b',
+              transition: 'all 0.2s ease'
             }}
           >
             Todos
@@ -182,14 +188,15 @@ export default function AutomationLogsPage() {
           <button 
             onClick={() => setFilterStatus('SUCCESS')}
             style={{
-              padding: '0.4rem 0.8rem',
-              borderRadius: '6px',
+              padding: '0.45rem 1.1rem',
+              borderRadius: '100px',
               border: 'none',
-              fontSize: '0.8rem',
-              fontWeight: 600,
+              fontSize: '0.82rem',
+              fontWeight: 700,
               cursor: 'pointer',
-              background: filterStatus === 'SUCCESS' ? '#10b981' : '#f1f5f9',
-              color: filterStatus === 'SUCCESS' ? '#ffffff' : '#475569'
+              background: filterStatus === 'SUCCESS' ? '#00a884' : '#f1f5f9',
+              color: filterStatus === 'SUCCESS' ? '#ffffff' : '#64748b',
+              transition: 'all 0.2s ease'
             }}
           >
             Éxito
@@ -197,21 +204,22 @@ export default function AutomationLogsPage() {
           <button 
             onClick={() => setFilterStatus('FAILED')}
             style={{
-              padding: '0.4rem 0.8rem',
-              borderRadius: '6px',
+              padding: '0.45rem 1.1rem',
+              borderRadius: '100px',
               border: 'none',
-              fontSize: '0.8rem',
-              fontWeight: 600,
+              fontSize: '0.82rem',
+              fontWeight: 700,
               cursor: 'pointer',
               background: filterStatus === 'FAILED' ? '#ef4444' : '#f1f5f9',
-              color: filterStatus === 'FAILED' ? '#ffffff' : '#475569'
+              color: filterStatus === 'FAILED' ? '#ffffff' : '#64748b',
+              transition: 'all 0.2s ease'
             }}
           >
-            Error
+            Fallidos
           </button>
         </div>
-        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-          Mostrando los últimos {filteredLogs.length} registros
+        <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+          Mostrando los últimos <strong>{filteredLogs.length}</strong> registros
         </span>
       </div>
 

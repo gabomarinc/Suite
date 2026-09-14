@@ -4,7 +4,6 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import IntegrationCard from "@/components/IntegrationCard";
 
-
 export default async function AutomatizacionesPage() {
   const { isAuthenticated, getUser } = getKindeServerSession();
   const isAuth = await isAuthenticated();
@@ -94,37 +93,26 @@ export default async function AutomatizacionesPage() {
   return (
     <main className="main-content integrations-hub-wrapper">
       
-      {/* Breadcrumbs & Header */}
-      <div className="settings-header-container">
-        <div className="settings-breadcrumbs">
-          <span>Inicio</span>
-          <span className="separator">/</span>
-          <span className="active">Automatizaciones</span>
-        </div>
-        
-        <div className="settings-title-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h2>Kônsul Connect</h2>
-            <p className="header-subtitle">Conecta las micro-SaaS del ecosistema de manera plug-and-play usando keys de servicio.</p>
+      {/* Dark Obsidian Hero Banner (Image 4 & 5 style) */}
+      <div className="dark-hero-card">
+        <div>
+          <div className="hero-tag-pill">
+            <div className="hero-tag-icon-box">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            </div>
+            <span>Ecosistema & Flujos Multi-App</span>
           </div>
+          <h1>Kônsul Connect</h1>
+          <p>Conecta las micro-SaaS de la suite de manera plug-and-play usando triggers y acciones unificadas.</p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           <Link 
             href="/automatizaciones/logs" 
-            style={{
-              background: '#0f172a',
-              color: '#ffffff',
-              padding: '0.6rem 1.2rem',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              textDecoration: 'none',
-              transition: 'all 0.2s',
-              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
+            className="btn-brand-teal"
           >
-            📋 Ver Historial (Logs)
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            Ver Historial (Logs)
           </Link>
         </div>
       </div>
@@ -138,17 +126,17 @@ export default async function AutomatizacionesPage() {
               const intData = activeIntegrationsMap.get(app.code);
               const isActive = intData?.isActive || false;
               
-              // Calculate radial coordinates identical to satellite translation
+              // Calculate radial coordinates
               const angle = (index * 2 * Math.PI) / apps.length;
-              const radius = 160; // slightly shorter for node center matching
+              const radius = 160;
               const x = Math.cos(angle) * radius;
               const y = Math.sin(angle) * radius;
               
               return (
                 <line
                   key={app.code}
-                  x1={250} // Centered in the 500px wide container
-                  y1={200} // Centered in the 400px high container
+                  x1={250}
+                  y1={200}
                   x2={250 + x}
                   y2={200 + y}
                   className={`connection-line-path ${isActive ? 'active' : ''}`}
@@ -170,7 +158,7 @@ export default async function AutomatizacionesPage() {
             
             // Calculate radial coordinates
             const angle = (index * 2 * Math.PI) / apps.length;
-            const radius = 160; // px
+            const radius = 160;
             const x = Math.cos(angle) * radius;
             const y = Math.sin(angle) * radius;
 
@@ -197,6 +185,7 @@ export default async function AutomatizacionesPage() {
         </div>
       </div>
 
+      {/* Integration Cards Grid */}
       <div className="integrations-grid">
         {apps.map(app => {
           const intData = activeIntegrationsMap.get(app.code);
