@@ -117,48 +117,56 @@ export default async function AutomatizacionesPage() {
         </div>
       </div>
 
-      {/* Visual Connection Hub Node Map */}
-      <div className="card-premium visual-hub-card">
+      {/* Visual Connection Hub Node Map - Dark Obsidian with Glowing Matrix Dots (Image 2 style) */}
+      <div className="visual-hub-card-dark">
+        <div className="visual-hub-top-pill">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+          <span>✦ Núcleo Central Suite & {apps.length} Apps Enlazadas</span>
+        </div>
+
         <div className="visual-hub-container">
           {/* SVG Connection Lines Overlay */}
-          <svg className="connections-svg" viewBox="0 0 500 400" style={{ position: 'absolute', width: '100%', height: '100%', top: 0, left: 0, pointerEvents: 'none', zIndex: 1 }}>
+          <svg className="connections-svg" viewBox="0 0 520 380" style={{ position: 'absolute', width: '100%', height: '100%', top: 0, left: 0, pointerEvents: 'none', zIndex: 1 }}>
             {apps.map((app, index) => {
               const intData = activeIntegrationsMap.get(app.code);
               const isActive = intData?.isActive || false;
               
               // Calculate radial coordinates
               const angle = (index * 2 * Math.PI) / apps.length;
-              const radius = 160;
+              const radius = 155;
               const x = Math.cos(angle) * radius;
               const y = Math.sin(angle) * radius;
               
               return (
                 <line
                   key={app.code}
-                  x1={250}
-                  y1={200}
-                  x2={250 + x}
-                  y2={200 + y}
-                  className={`connection-line-path ${isActive ? 'active' : ''}`}
+                  x1={260}
+                  y1={190}
+                  x2={260 + x}
+                  y2={190 + y}
+                  className={`connection-line-path-dark ${isActive ? 'active' : ''}`}
                 />
               );
             })}
           </svg>
 
-          <div className="central-node">
-            <div className="node-glow"></div>
+          {/* Central Suite Core */}
+          <div className="central-node-dark">
+            <div className="node-glow-dark"></div>
             <img src="https://konsul.digital/images/logo-app-konsul.png" alt="Kônsul Suite" />
             <span>Kônsul Suite</span>
           </div>
 
+          {/* Satellite App Nodes matching Image 2 */}
           {apps.map((app, index) => {
             const intData = activeIntegrationsMap.get(app.code);
             const isActive = intData?.isActive || false;
             const hasKey = !!intData?.serviceKey;
+            const appRuleCount = dbRules.filter(r => r.sourceApp === app.code || r.targetApp === app.code).length;
             
             // Calculate radial coordinates
             const angle = (index * 2 * Math.PI) / apps.length;
-            const radius = 160;
+            const radius = 155;
             const x = Math.cos(angle) * radius;
             const y = Math.sin(angle) * radius;
 
@@ -170,10 +178,17 @@ export default async function AutomatizacionesPage() {
                   transform: `translate(${x}px, ${y}px)`
                 }}
               >
-                <div className="satellite-node" style={{ borderColor: app.color, background: app.bgLight }}>
-                  <div className="node-icon" style={{ color: app.color }}>{app.icon}</div>
+                <div className={`satellite-node-dark ${isActive ? 'active' : ''}`}>
+                  {isActive && (
+                    <div className="node-counter-badge">
+                      {appRuleCount > 0 ? appRuleCount : '✓'}
+                    </div>
+                  )}
+                  <div className="node-icon" style={{ color: isActive ? '#ffffff' : app.color }}>
+                    {app.icon}
+                  </div>
                 </div>
-                <div className="satellite-label">
+                <div className="satellite-label-dark">
                   <strong>{app.name}</strong>
                   <span className="status-indicator">
                     {isActive ? 'Conectado' : hasKey ? 'Pausado' : 'Desconectado'}
@@ -185,8 +200,20 @@ export default async function AutomatizacionesPage() {
         </div>
       </div>
 
-      {/* Integration Cards Grid */}
-      <div className="integrations-grid">
+      {/* Section Header for Apps List */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', marginBottom: '0.5rem' }}>
+        <div>
+          <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-heading)' }}>
+            Herramientas & Flujos Disponibles
+          </h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            Haz clic en <strong>Automatizar</strong> para desplegar las reglas activas o crear una nueva conexión.
+          </p>
+        </div>
+      </div>
+
+      {/* Integration Apps List Rows (Image 3 style) */}
+      <div className="integrations-list-container">
         {apps.map(app => {
           const intData = activeIntegrationsMap.get(app.code);
           const isActive = intData?.isActive || false;

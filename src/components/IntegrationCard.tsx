@@ -57,8 +57,11 @@ export default function IntegrationCard({
   const [testLog, setTestLog] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Automation Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Accordion & Tab State
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<'builder' | 'rules' | 'credentials'>('builder');
+
+  // Automation Builder State
   const [selectedTriggerIdx, setSelectedTriggerIdx] = useState(0);
   const [targetApp, setTargetApp] = useState<string>('process');
   const [selectedActionIdx, setSelectedActionIdx] = useState(0);
@@ -69,11 +72,11 @@ export default function IntegrationCard({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [connectedIntegrations, setConnectedIntegrations] = useState<any[]>([]);
   
-  // Mapeos de campos del formulario
+  // Field Mappings
   const [mappingValues, setMappingValues] = useState<Record<string, string>>({});
   const [mappingTypes, setMappingTypes] = useState<Record<string, 'field' | 'static'>>({});
   
-  // Lista de reglas de automatización globales (vienen de la BD)
+  // Rules State
   const [rules, setRules] = useState<AutomationRule[]>(initialRules);
 
   useEffect(() => {
@@ -100,7 +103,6 @@ export default function IntegrationCard({
   useEffect(() => {
     const active = connectedIntegrations.filter(i => i.isActive && i.serviceKey);
     if (active.length > 0) {
-      // If current targetApp is not active/connected, select the first active one
       if (!targetApp || !active.some(a => a.appCode === targetApp)) {
         setTargetApp(active[0].appCode);
       }
@@ -109,7 +111,7 @@ export default function IntegrationCard({
     }
   }, [connectedIntegrations, targetApp]);
 
-  // Listener to keep cards in sync using Server Actions
+  // Sync rules across cards
   useEffect(() => {
     const handleRulesUpdate = async () => {
       try {
@@ -123,7 +125,7 @@ export default function IntegrationCard({
     return () => window.removeEventListener('konsul_rules_updated', handleRulesUpdate);
   }, []);
 
-  // Fetch Process templates when targetApp is set to 'process' using target app's API key
+  // Fetch Process templates
   useEffect(() => {
     const targetIntegration = connectedIntegrations.find(i => i.appCode === targetApp);
     const targetServiceKey = targetIntegration?.serviceKey;
@@ -152,8 +154,7 @@ export default function IntegrationCard({
     } else {
       setProcessTemplates([]);
     }
-  }, [targetApp, connectedIntegrations, isModalOpen]);
-
+  }, [targetApp, connectedIntegrations, isExpanded]);
 
   const handleToggle = async () => {
     try {
@@ -174,8 +175,9 @@ export default function IntegrationCard({
       setServiceKey(trimmedKey);
       setInputKey(trimmedKey);
       setIsActive(!!trimmedKey);
-      setTestStatus('success'); // default verified status once saved
+      setTestStatus('success');
       window.dispatchEvent(new Event('konsul_integrations_updated'));
+      alert('¡Service Key guardado con éxito!');
     } catch (e) {
       console.error(e);
     } finally {
@@ -249,15 +251,14 @@ export default function IntegrationCard({
         mappingTypes: finalTypes
       });
 
-      // Update client state & notify other cards
       const newRules = [savedRule as unknown as AutomationRule, ...rules];
       setRules(newRules);
       window.dispatchEvent(new Event('konsul_rules_updated'));
 
-      // Clear mappings state
       setMappingValues({});
       setMappingTypes({});
-      alert('¡Regla de automatización conectada y guardada en BD con éxito! ⚡');
+      setActiveTab('rules');
+      alert('¡Regla de automatización creada y activada con éxito! ⚡');
     } catch (err) {
       console.error(err);
       alert('Error al guardar la regla en la base de datos.');
@@ -268,7 +269,6 @@ export default function IntegrationCard({
     const srcAppObj = ALL_APPS[rule.sourceApp];
     const trigName = srcAppObj?.triggers[rule.triggerIdx]?.name || '';
 
-    // Build mock data based on trigger type
     let mockData: Record<string, string> = {};
     if (rule.sourceApp === 'bills') {
       if (trigName === 'Nuevo Cliente o Prospecto') {
@@ -278,18 +278,12 @@ export default function IntegrationCard({
           'Teléfono': '+507 6000-1111',
           'Fecha de Creación': new Date().toISOString()
         };
-      } else if (trigName === 'Documento Creado (Factura/Cotización)') {
+      } else {
         mockData = {
           'Nombre del Cliente': 'Cliente Manual Factura S.A.',
           'Email del Cliente': 'cliente-factura-manual@suite.com',
           'Monto Total': '850.00',
           'Concepto de Venta': 'Servicio Técnico de Servidores',
-          'Fecha de Creación': new Date().toISOString()
-        };
-      } else {
-        mockData = {
-          'Nombre del Cliente': 'Prueba Genérica',
-          'Email del Cliente': 'test-generic@suite.com',
           'Fecha de Creación': new Date().toISOString()
         };
       }
@@ -304,13 +298,11 @@ export default function IntegrationCard({
     try {
       const response = await fetch('/api/v1/automations/trigger', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           appCode: rule.sourceApp,
           triggerName: trigName,
-          userId: rule.userId, // Send the rule's userId directly
+          userId: rule.userId,
           data: mockData
         })
       });
@@ -336,7 +328,7 @@ export default function IntegrationCard({
       window.dispatchEvent(new Event('konsul_rules_updated'));
     } catch (err) {
       console.error(err);
-      alert('Error al borrar la regla de la base de datos.');
+      alert('Error al borrar la regla.');
     }
   };
 
@@ -355,721 +347,641 @@ export default function IntegrationCard({
     }
   };
 
-  // Hide the test connection button once connection is successfully configured & validated
-  const showTestButton = inputKey !== '' && (inputKey !== serviceKey || testStatus === 'loading' || testStatus === 'error');
-  const isConnectionVerified = serviceKey !== '' && (testStatus === 'success' || isActive);
-
-  // Filter rules relevant to this current app card (either as origin or destination)
   const currentAppRules = rules.filter(r => r.sourceApp === app.code || r.targetApp === app.code);
-
   const activeConnectedTargetApps = connectedIntegrations.filter(i => i.isActive && i.serviceKey);
   const hasActiveTargetApps = activeConnectedTargetApps.length > 0;
+  const isConnected = !!serviceKey && isActive;
 
   return (
-    <div className="card-premium integration-card">
-      <div className="integration-card-header">
-        <div className="integration-app-info">
-          <div className="app-icon-wrapper" style={{ background: app.bgLight, color: app.color }}>
+    <div className={`app-list-row ${isExpanded ? 'expanded' : ''}`}>
+      
+      {/* Horizontal List Header Row matching Image 3 */}
+      <div 
+        className="app-list-header" 
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="app-list-left">
+          {/* App Icon with green checkmark badge in bottom right (Image 3 style) */}
+          <div className="app-icon-with-check" style={{ background: app.bgLight, color: app.color }}>
             {app.icon}
+            {isConnected && (
+              <div className="app-icon-check-badge">✓</div>
+            )}
           </div>
+
           <div>
-            <h4>{app.name}</h4>
-            <p className="app-desc">{app.description}</p>
+            <div className="app-title-group">
+              <h4>{app.name}</h4>
+              {isConnected ? (
+                <span className="app-badge-pill-connected">CONECTADO</span>
+              ) : (
+                <span className="app-badge-pill-disconnected">DESCONECTADO</span>
+              )}
+            </div>
+            
+            <div className="app-meta-tags">
+              <span className="app-meta-tag-item">
+                <strong>PREFIX:</strong> {app.keyPrefix}
+              </span>
+              <span>•</span>
+              <span className="app-meta-tag-item">
+                <strong>TIPO:</strong> {app.description.toUpperCase()}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Quick Toggle Status */}
-        {serviceKey && (
-          <button 
-            type="button" 
-            onClick={handleToggle}
-            className={`switch-toggle ${isActive ? 'active' : ''}`}
-          >
-            <div className="switch-handle"></div>
-          </button>
-        )}
-      </div>
-
-      <div className="integration-card-body">
-        <form onSubmit={handleSave}>
-          <div className="input-group-full">
-            <label>SERVICE KEY ({app.keyPrefix}...)</label>
-            <div className="input-with-icon">
-              <div className="input-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-              </div>
-              <input 
-                type={showPassword ? "text" : "password"} 
-                value={inputKey}
-                onChange={(e) => {
-                  setInputKey(e.target.value);
-                  setTestStatus('idle');
-                }}
-                placeholder={`Ej: ${app.keyPrefix.split(' ')[0]}xxxxxxxx`} 
-                autoComplete="new-password"
-                style={{ paddingRight: '2.5rem' }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '1rem',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#94a3b8',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 0
-                }}
+        <div className="app-list-right" onClick={(e) => e.stopPropagation()}>
+          {/* Active Switch Toggle (Image 3 style) */}
+          {serviceKey && (
+            <div className="app-active-toggle-group">
+              <span className="app-active-label">ACTIVO</span>
+              <button 
+                type="button" 
+                onClick={handleToggle}
+                className={`switch-toggle ${isActive ? 'active' : ''}`}
+                title={isActive ? "Pausar app" : "Activar app"}
               >
-                {showPassword ? (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="10" x2="23" y2="23"></line></svg>
-                ) : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                )}
+                <div className="switch-handle"></div>
               </button>
             </div>
-          </div>
-          <div className="integration-actions" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-            {showTestButton && (
-              <button 
-                type="button" 
-                onClick={handleTestConnection}
-                className="btn-test-connection"
-                style={{
-                  background: 'transparent',
-                  border: '1px solid #cbd5e1',
-                  color: '#475569',
-                  padding: '0.6rem 1.2rem',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                Probar Conexión
-              </button>
-            )}
-            
-            {/* Automate Button: Shown only when connection key is active & verified */}
-            {isConnectionVerified && (
-              <button 
-                type="button" 
-                onClick={() => setIsModalOpen(true)}
-                className="btn-automate"
-                style={{
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '0.6rem 1.25rem',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  letterSpacing: '0.02em',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(37, 99, 235, 0.4)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
-                }}
-              >
-                Automatizar
-              </button>
-            )}
+          )}
 
-            <button type="submit" className="btn-save-key" disabled={isSaving}>
-              {isSaving ? 'Guardando...' : serviceKey ? 'Actualizar Clave' : 'Conectar Aplicación'}
+          {/* Action Accordion Toggle Button */}
+          <button 
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className={`btn-accordion-toggle ${isExpanded ? 'active' : ''}`}
+          >
+            <span>{isExpanded ? 'Cerrar Flujo' : 'Automatizar'}</span>
+            <svg 
+              width="14" 
+              height="14" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+            >
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Expandable Accordion Drawer underneath the App Row */}
+      {isExpanded && (
+        <div className="app-accordion-drawer">
+          
+          {/* Tabs Bar */}
+          <div className="accordion-tabs-bar">
+            <button 
+              type="button" 
+              onClick={() => setActiveTab('builder')}
+              className={`accordion-tab-btn ${activeTab === 'builder' ? 'active' : ''}`}
+            >
+              <span>⚡</span> Nueva Automatización
+            </button>
+            <button 
+              type="button" 
+              onClick={() => setActiveTab('rules')}
+              className={`accordion-tab-btn ${activeTab === 'rules' ? 'active' : ''}`}
+            >
+              <span>✦</span> Reglas Activas ({currentAppRules.length})
+            </button>
+            <button 
+              type="button" 
+              onClick={() => setActiveTab('credentials')}
+              className={`accordion-tab-btn ${activeTab === 'credentials' ? 'active' : ''}`}
+            >
+              <span>🔑</span> Credenciales (Service Key)
             </button>
           </div>
-        </form>
 
-        {/* Console/Test Logs Display */}
-        {testStatus !== 'idle' && (
-          <div className={`test-results-log ${testStatus}`} style={{
-            marginTop: '1.25rem',
-            padding: '1rem',
-            borderRadius: '12px',
-            background: testStatus === 'success' ? '#f0fdf4' : testStatus === 'error' ? '#fef2f2' : '#f8fafc',
-            border: `1px solid ${testStatus === 'success' ? '#bbf7d0' : testStatus === 'error' ? '#fecaca' : '#e2e8f0'}`,
-            fontSize: '0.8rem',
-            fontFamily: 'monospace',
-            color: testStatus === 'success' ? '#166534' : testStatus === 'error' ? '#991b1b' : '#475569'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-              <span>RESULTADOS DEL TEST:</span>
-              <span>
-                {testStatus === 'loading' && '⌛ Probando...'}
-                {testStatus === 'success' && '✅ Éxito'}
-                {testStatus === 'error' && '❌ Falló'}
-              </span>
-            </div>
-            <div style={{ maxHeight: '120px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              {testLog.map((log, idx) => (
-                <div key={idx}>&gt; {log}</div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* AUTOMATION BUILDER MODAL */}
-      {isModalOpen && (
-        <div className="modal-overlay" style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999,
-          padding: '1rem'
-        }}>
-          <div className="modal-content card-premium" style={{
-            width: '100%',
-            maxWidth: '680px',
-            background: '#ffffff',
-            borderRadius: '16px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
-            display: 'flex',
-            flexDirection: 'column',
-            maxHeight: '90vh',
-            overflow: 'hidden'
-          }}>
-            {/* Modal Header */}
-            <div className="modal-header" style={{
-              padding: '1.5rem',
-              borderBottom: '1px solid #f1f5f9',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              background: `linear-gradient(135deg, ${app.bgLight} 0%, #ffffff 100%)`
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ color: app.color, background: 'white', padding: '0.5rem', borderRadius: '8px', display: 'flex', border: '1px solid #f1f5f9' }}>
-                  {app.icon}
-                </div>
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a', fontWeight: 700 }}>
-                    Kônsul Connect Builder: {app.name}
-                  </h4>
-                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
-                    Conecta eventos de esta aplicación con acciones automatizadas de tu ecosistema
-                  </p>
-                </div>
-              </div>
-              <button 
-                type="button" 
-                onClick={() => setIsModalOpen(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                  color: '#64748b',
-                  lineHeight: '1'
-                }}
-              >
-                &times;
-              </button>
-            </div>
-
-            {/* Modal Scrollable Body */}
-            <div className="modal-body" style={{
-              padding: '1.5rem',
-              overflowY: 'auto',
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1.5rem'
-            }}>
-              
-              {/* Form Rule Configuration */}
-              <form onSubmit={handleAddRule} style={{
-                background: '#f8fafc',
-                padding: '1.25rem',
-                borderRadius: '12px',
-                border: '1px solid #e2e8f0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1.25rem'
-              }}>
-                <h5 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span>🔗</span> Nueva Regla de Automatización
-                </h5>
-
-                {/* Paso 1: Origen */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    1. DISPARADOR (ORIGEN)
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.5rem' }}>
-                    <input 
-                      type="text" 
-                      readOnly 
-                      value={app.name} 
-                      style={{
-                        padding: '0.55rem',
-                        fontSize: '0.85rem',
-                        background: '#e2e8f0',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '6px',
-                        fontWeight: 600,
-                        color: '#475569'
-                      }}
-                    />
-                    <select
-                      value={selectedTriggerIdx}
-                      onChange={(e) => {
-                        setSelectedTriggerIdx(parseInt(e.target.value));
-                        setMappingValues({});
-                        setMappingTypes({});
-                      }}
-                      style={{
-                        padding: '0.55rem',
-                        fontSize: '0.85rem',
-                        background: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '6px',
-                        width: '100%',
-                        minWidth: 0
-                      }}
-                    >
-                      {currentAppConfig.triggers.map((trig, idx) => (
-                        <option key={idx} value={idx}>{trig.name}</option>
-                      ))}
-                    </select>
+          {/* TAB 1: VISUAL FLOW BUILDER CANVAS (IMAGE 1 STYLE) */}
+          {activeTab === 'builder' && (
+            <div className="flow-canvas-container">
+              {/* Header matching Image 1 */}
+              <div className="flow-canvas-header">
+                <div className="flow-canvas-header-left">
+                  <div className="flow-funnel-icon-box">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                    </svg>
                   </div>
-                  {/* Outputs preview */}
-                  <div style={{ marginTop: '0.2rem' }}>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                      💡 Campo(s) disponibles para mapear: 
-                    </span>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.25rem' }}>
-                      {currentAppConfig.triggers[selectedTriggerIdx]?.outputs.map(out => (
-                        <span key={out} style={{
-                          fontSize: '0.65rem',
-                          background: `${app.bgLight}`,
-                          color: `${app.color}`,
-                          padding: '0.15rem 0.4rem',
-                          borderRadius: '4px',
-                          border: `1px solid ${app.bgLight}`,
-                          fontFamily: 'monospace'
-                        }}>
-                          {out}
-                        </span>
-                      ))}
+                  <div>
+                    <h3>Filtros & Automatizaciones</h3>
+                    <p>Conecta condiciones y acciones para construir tu flujo desde {app.name}</p>
+                  </div>
+                </div>
+
+                <button 
+                  type="button" 
+                  onClick={handleAddRule} 
+                  disabled={!hasActiveTargetApps}
+                  className="btn-orange-submit"
+                >
+                  <span>+</span> SUMAR Y EJECUTAR
+                </button>
+              </div>
+
+              {/* Flow Nodes matching Image 1 */}
+              <form onSubmit={handleAddRule}>
+                <div className="flow-nodes-row">
+                  
+                  {/* Node 1: Trigger / Disparador Origen */}
+                  <div className="flow-node-trigger">
+                    <div className="flow-node-header">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                      </svg>
+                      <span className="node-type-label">DISPARADOR (ORIGEN)</span>
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.4rem' }}>
+                        {app.name}
+                      </div>
+                      <select
+                        value={selectedTriggerIdx}
+                        onChange={(e) => {
+                          setSelectedTriggerIdx(parseInt(e.target.value));
+                          setMappingValues({});
+                          setMappingTypes({});
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem',
+                          borderRadius: '10px',
+                          border: '1.5px solid #cbd5e1',
+                          background: '#f8fafc',
+                          fontWeight: 600,
+                          fontSize: '0.85rem',
+                          color: '#0f172a',
+                          outline: 'none'
+                        }}
+                      >
+                        {currentAppConfig.triggers.map((trig: any, idx: number) => (
+                          <option key={idx} value={idx}>{trig.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Outputs preview */}
+                    <div>
+                      <span style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                        VARIABLES DISPONIBLES:
+                      </span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.35rem' }}>
+                        {currentAppConfig.triggers[selectedTriggerIdx]?.outputs.map((out: string) => (
+                          <span key={out} style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            background: '#f0fdfa',
+                            color: '#0d9488',
+                            padding: '0.2rem 0.5rem',
+                            borderRadius: '6px',
+                            border: '1px solid #ccfbf1'
+                          }}>
+                            {out}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Paso 2: Destino */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    2. ACCIÓN (DESTINO)
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.5rem' }}>
+                  {/* Connecting Flow Arrow with animated dot */}
+                  <div className="flow-connector-wrapper">
+                    <div className="flow-connector-line">
+                      <span style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>──</span>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00a884', boxShadow: '0 0 8px #00a884' }}></div>
+                      <span style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>──▶</span>
+                    </div>
+                  </div>
+
+                  {/* Node 2: Action / Target Node (Green border, Image 1 style) */}
+                  <div className="flow-node-action">
+                    <div className="flow-node-header">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                      </svg>
+                      <span className="node-type-label">+ NUEVO DESTINO / ACCIÓN</span>
+                    </div>
+
                     {hasActiveTargetApps ? (
-                      <>
-                        <select
-                          value={targetApp}
-                          onChange={(e) => {
-                            setTargetApp(e.target.value);
-                            setSelectedActionIdx(0);
-                            setMappingValues({});
-                            setMappingTypes({});
-                          }}
-                          style={{
-                            padding: '0.55rem',
-                            fontSize: '0.85rem',
-                            background: '#ffffff',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '6px',
-                            fontWeight: 600,
-                            width: '100%',
-                            minWidth: 0
-                          }}
-                        >
-                          {activeConnectedTargetApps.map(i => (
-                            <option key={i.appCode} value={i.appCode}>{ALL_APPS[i.appCode]?.name || i.appCode}</option>
-                          ))}
-                        </select>
-                        {targetApp === 'process' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {/* Target App Selector */}
+                        <div>
+                          <label style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
+                            APLICACIÓN DESTINO
+                          </label>
                           <select
-                            disabled
-                            style={{
-                              padding: '0.55rem',
-                              fontSize: '0.85rem',
-                              background: '#f8fafc',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '6px',
-                              color: '#475569',
-                              width: '100%',
-                              minWidth: 0
-                            }}
-                          >
-                            <option>Ejecutar Plantilla de Proceso</option>
-                          </select>
-                        ) : (
-                          <select
-                            value={selectedActionIdx}
+                            value={targetApp}
                             onChange={(e) => {
-                              setSelectedActionIdx(parseInt(e.target.value));
+                              setTargetApp(e.target.value);
+                              setSelectedActionIdx(0);
                               setMappingValues({});
                               setMappingTypes({});
                             }}
                             style={{
-                              padding: '0.55rem',
-                              fontSize: '0.85rem',
-                              background: '#ffffff',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '6px',
                               width: '100%',
-                              minWidth: 0
+                              padding: '0.65rem',
+                              borderRadius: '10px',
+                              border: '1.5px solid #5eead4',
+                              background: '#ffffff',
+                              fontWeight: 700,
+                              fontSize: '0.85rem',
+                              color: '#0f172a'
                             }}
                           >
-                            {targetAppConfig.actions.map((act, idx) => (
-                              <option key={idx} value={idx}>{act.name}</option>
+                            {activeConnectedTargetApps.map(i => (
+                              <option key={i.appCode} value={i.appCode}>
+                                {ALL_APPS[i.appCode]?.name || i.appCode}
+                              </option>
                             ))}
                           </select>
-                        )}
-                      </>
+                        </div>
+
+                        {/* Action Selector */}
+                        <div>
+                          <label style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
+                            ACCIÓN A EJECUTAR
+                          </label>
+                          {targetApp === 'process' ? (
+                            <select
+                              value={selectedTemplateId}
+                              onChange={(e) => {
+                                setSelectedTemplateId(e.target.value);
+                                setMappingValues({});
+                                setMappingTypes({});
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '0.65rem',
+                                borderRadius: '10px',
+                                border: '1.5px solid #cbd5e1',
+                                background: '#ffffff',
+                                fontWeight: 600,
+                                fontSize: '0.85rem',
+                                color: '#0f172a'
+                              }}
+                            >
+                              {isLoadingTemplates ? (
+                                <option>⏳ Cargando plantillas desde Process...</option>
+                              ) : processTemplates.length === 0 ? (
+                                <option>⚠️ Sin plantillas disponibles</option>
+                              ) : (
+                                processTemplates.map(t => (
+                                  <option key={t.id} value={t.id}>📄 {t.name}</option>
+                                ))
+                              )}
+                            </select>
+                          ) : (
+                            <select
+                              value={selectedActionIdx}
+                              onChange={(e) => {
+                                setSelectedActionIdx(parseInt(e.target.value));
+                                setMappingValues({});
+                                setMappingTypes({});
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '0.65rem',
+                                borderRadius: '10px',
+                                border: '1.5px solid #cbd5e1',
+                                background: '#ffffff',
+                                fontWeight: 600,
+                                fontSize: '0.85rem',
+                                color: '#0f172a'
+                              }}
+                            >
+                              {targetAppConfig.actions.map((act: any, idx: number) => (
+                                <option key={idx} value={idx}>{act.name}</option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+
+                        {/* Mappings */}
+                        <div>
+                          <label style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.4rem', display: 'block' }}>
+                            MAPEO DE VARIABLES
+                          </label>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {(() => {
+                              const activeFields = targetApp === 'process'
+                                ? (processTemplates.find(t => t.id === selectedTemplateId)?.variables || []).filter((v: string) => v !== 'Miembro Involucrado (Email)')
+                                : (targetAppConfig.actions[selectedActionIdx]?.fields || []);
+                                
+                              if (activeFields.length === 0) {
+                                return (
+                                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                    No hay variables requeridas para esta acción.
+                                  </div>
+                                );
+                              }
+
+                              return activeFields.map((field: string) => {
+                                const mType = mappingTypes[field] || 'static';
+                                const availOutputs = currentAppConfig.triggers[selectedTriggerIdx]?.outputs || [];
+                                
+                                return (
+                                  <div key={field} style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '1.2fr 1fr 1.5fr',
+                                    alignItems: 'center',
+                                    gap: '0.4rem',
+                                    background: '#f8fafc',
+                                    padding: '0.5rem 0.6rem',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e2e8f0'
+                                  }}>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e293b' }}>
+                                      {field}
+                                    </span>
+                                    
+                                    <select
+                                      value={mType}
+                                      onChange={(e) => {
+                                        const t = e.target.value as 'field' | 'static';
+                                        setMappingTypes({ ...mappingTypes, [field]: t });
+                                        setMappingValues({ ...mappingValues, [field]: '' });
+                                      }}
+                                      style={{
+                                        padding: '0.35rem',
+                                        fontSize: '0.72rem',
+                                        border: '1px solid #cbd5e1',
+                                        borderRadius: '6px',
+                                        background: '#ffffff'
+                                      }}
+                                    >
+                                      <option value="field">🔗 Variable</option>
+                                      <option value="static">✍️ Fijo</option>
+                                    </select>
+
+                                    {mType === 'field' ? (
+                                      <select
+                                        required
+                                        value={mappingValues[field] || ''}
+                                        onChange={(e) => setMappingValues({ ...mappingValues, [field]: e.target.value })}
+                                        style={{
+                                          padding: '0.35rem',
+                                          fontSize: '0.72rem',
+                                          border: '1px solid #cbd5e1',
+                                          borderRadius: '6px'
+                                        }}
+                                      >
+                                        <option value="">-- Campo --</option>
+                                        {availOutputs.map((out: string) => (
+                                          <option key={out} value={out}>{out}</option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <input
+                                        type="text"
+                                        required
+                                        placeholder="Valor fijo"
+                                        value={mappingValues[field] || ''}
+                                        onChange={(e) => setMappingValues({ ...mappingValues, [field]: e.target.value })}
+                                        style={{
+                                          padding: '0.35rem 0.5rem',
+                                          fontSize: '0.72rem',
+                                          border: '1px solid #cbd5e1',
+                                          borderRadius: '6px'
+                                        }}
+                                      />
+                                    )}
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
+                        </div>
+
+                        {/* Confirmation Button */}
+                        <button 
+                          type="submit" 
+                          className="btn-teal-confirm"
+                        >
+                          + CONFIRMAR
+                        </button>
+                      </div>
                     ) : (
                       <div style={{
-                        gridColumn: '1 / span 2',
-                        padding: '0.75rem',
+                        padding: '1.25rem',
                         background: '#fff1f2',
                         border: '1px dashed #fecdd3',
-                        borderRadius: '6px',
+                        borderRadius: '12px',
                         color: '#be123c',
-                        fontSize: '0.8rem',
+                        fontSize: '0.85rem',
                         textAlign: 'center',
-                        fontWeight: 500
+                        fontWeight: 600
                       }}>
-                        ⚠️ No hay otras aplicaciones configuradas y activas para automatizar. Conecta y activa alguna otra app en el dashboard primero.
+                        ⚠️ Conecta otra app primero para poder enlazar este disparador.
                       </div>
                     )}
                   </div>
 
-                  {targetApp === 'process' && (
-                    <div style={{ marginTop: '0.5rem' }}>
-                      <select
-                        value={selectedTemplateId}
-                        onChange={(e) => {
-                          setSelectedTemplateId(e.target.value);
-                          setMappingValues({});
-                          setMappingTypes({});
-                        }}
-                        disabled={isLoadingTemplates || processTemplates.length === 0}
-                        style={{
-                          width: '100%',
-                          padding: '0.55rem',
-                          fontSize: '0.85rem',
-                          background: '#ffffff',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '6px',
-                          fontWeight: 600,
-                          color: '#0f172a'
-                        }}
-                      >
-                        {isLoadingTemplates ? (
-                          <option value="">⏳ Cargando plantillas desde Process...</option>
-                        ) : processTemplates.length === 0 ? (
-                          <option value="">⚠️ No hay plantillas (Revisa tu Service Key de Process)</option>
-                        ) : (
-                          processTemplates.map(t => (
-                            <option key={t.id} value={t.id}>📄 {t.name}</option>
-                          ))
-                        )}
-                      </select>
-                      {processTemplates.find(t => t.id === selectedTemplateId)?.description && (
-                        <p style={{ margin: '0.5rem 0 0', fontSize: '0.75rem', color: '#64748b' }}>
-                          {processTemplates.find(t => t.id === selectedTemplateId)?.description}
-                        </p>
-                      )}
-                    </div>
-                  )}
                 </div>
+              </form>
+            </div>
+          )}
 
-                {/* Paso 3: Mapeo de Variables Inteligente */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    3. CORRELACIÓN & MAPEO DE CAMPOS (INTELLIGENT MAPPER)
-                  </label>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' }}>
-                    {(() => {
-                      const activeFields = targetApp === 'process'
-                        ? (processTemplates.find(t => t.id === selectedTemplateId)?.variables || []).filter((v: string) => v !== 'Miembro Involucrado (Email)')
-                        : (targetAppConfig.actions[selectedActionIdx]?.fields || []);
-                        
-                      if (activeFields.length === 0) {
-                        return (
-                          <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
-                            {!targetApp 
-                              ? 'Selecciona una aplicación de destino activa para configurar campos.' 
-                              : targetApp === 'process' 
-                                ? 'No hay variables requeridas para esta plantilla.' 
-                                : 'No hay campos que configurar para esta acción.'}
-                          </div>
-                        );
-                      }
+          {/* TAB 2: REGLAS ACTIVAS LIST */}
+          {activeTab === 'rules' && (
+            <div className="rules-list-container">
+              {currentAppRules.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem 2rem', background: '#ffffff', borderRadius: '16px', border: '1px dashed var(--border-color)' }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>⚡</div>
+                  <h4 style={{ color: 'var(--text-heading)', marginBottom: '0.35rem' }}>No hay reglas activas para {app.name}</h4>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+                    Diseña tu primer flujo automatizado para conectar eventos en tiempo real.
+                  </p>
+                  <button 
+                    type="button" 
+                    onClick={() => setActiveTab('builder')}
+                    className="btn-brand-teal"
+                  >
+                    + Diseñar Flujo Ahora
+                  </button>
+                </div>
+              ) : (
+                currentAppRules.map(rule => {
+                  const srcAppObj = ALL_APPS[rule.sourceApp];
+                  const targetAppObj = ALL_APPS[rule.targetApp];
+                  const trigName = srcAppObj?.triggers[rule.triggerIdx]?.name || 'Disparador';
+                  const actName = targetAppObj?.actions[rule.actionIdx]?.name || 'Acción';
 
-                      return activeFields.map((field: string) => {
-                      const mType = mappingTypes[field] || 'static';
-                      const availOutputs = currentAppConfig.triggers[selectedTriggerIdx]?.outputs || [];
-                      
-                      return (
-                        <div key={field} style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1.5fr 1.5fr 2fr',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          background: '#ffffff',
-                          padding: '0.6rem',
-                          borderRadius: '6px',
-                          border: '1px solid #e2e8f0'
-                        }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#1e293b' }}>
-                            👉 {field}
+                  return (
+                    <div key={rule.id} className="rule-item-card">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#3b82f6', background: '#eff6ff', padding: '0.2rem 0.6rem', borderRadius: '6px' }}>
+                            {APP_NAMES_MAP[rule.sourceApp]}
                           </span>
-                          
-                          <select
-                            value={mType}
-                            onChange={(e) => {
-                              const t = e.target.value as 'field' | 'static';
-                              setMappingTypes({ ...mappingTypes, [field]: t });
-                              setMappingValues({ ...mappingValues, [field]: '' });
-                            }}
-                            style={{
-                              padding: '0.35rem',
-                              fontSize: '0.75rem',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '4px',
-                              background: '#f8fafc'
-                            }}
-                          >
-                            <option value="field">🔗 Enlazar Variable</option>
-                            <option value="static">✍️ Texto Fijo</option>
-                          </select>
-
-                          {mType === 'field' ? (
-                            <select
-                              required
-                              value={mappingValues[field] || ''}
-                              onChange={(e) => setMappingValues({ ...mappingValues, [field]: e.target.value })}
-                              style={{
-                                padding: '0.35rem',
-                                fontSize: '0.75rem',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '4px'
-                              }}
-                            >
-                              <option value="">-- Seleccionar Campo --</option>
-                              {availOutputs.map(out => (
-                                <option key={out} value={out}>{out}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <input
-                              type="text"
-                              required
-                              placeholder="Escribe un valor fijo"
-                              value={mappingValues[field] || ''}
-                              onChange={(e) => setMappingValues({ ...mappingValues, [field]: e.target.value })}
-                              style={{
-                                padding: '0.35rem 0.5rem',
-                                fontSize: '0.75rem',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '4px'
-                              }}
-                            />
-                          )}
+                          <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>➔</span>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0d9488', background: '#f0fdfa', padding: '0.2rem 0.6rem', borderRadius: '6px' }}>
+                            {APP_NAMES_MAP[rule.targetApp]}
+                          </span>
                         </div>
-                      );
-                    })})()}
+                        <div style={{ fontSize: '0.85rem', color: '#1e293b' }}>
+                          <strong>Cuando:</strong> {trigName} ➔ <strong>Ejecutar:</strong> {actName}
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.2rem' }}>
+                          {Object.entries(rule.mappings).map(([k, v]) => {
+                            const isFld = rule.mappingTypes[k] === 'field';
+                            return (
+                              <span key={k} style={{
+                                fontSize: '0.68rem',
+                                background: '#f1f5f9',
+                                color: '#475569',
+                                padding: '0.15rem 0.45rem',
+                                borderRadius: '4px',
+                                fontFamily: 'monospace'
+                              }}>
+                                {k} = {isFld ? `🔗 ${v}` : `"${v}"`}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleTestRuleTrigger(rule)}
+                          style={{
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            color: '#2563eb',
+                            padding: '0.4rem 0.8rem',
+                            borderRadius: '8px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          🧪 Probar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleRule(rule.id)}
+                          className={`switch-toggle ${rule.isActive ? 'active' : ''}`}
+                          style={{ transform: 'scale(0.85)' }}
+                          title={rule.isActive ? "Desactivar" : "Activar"}
+                        >
+                          <div className="switch-handle"></div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRule(rule.id)}
+                          style={{
+                            background: '#fee2e2',
+                            border: 'none',
+                            color: '#dc2626',
+                            cursor: 'pointer',
+                            borderRadius: '8px',
+                            padding: '0.4rem 0.6rem',
+                            fontSize: '0.85rem'
+                          }}
+                          title="Eliminar regla"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: CREDENCIALES & SERVICE KEY */}
+          {activeTab === 'credentials' && (
+            <div style={{ background: '#ffffff', borderRadius: '18px', padding: '2rem', border: '1px solid var(--border-color)' }}>
+              <form onSubmit={handleSave}>
+                <div className="input-group-full" style={{ marginBottom: '1.25rem' }}>
+                  <label>SERVICE KEY ({app.keyPrefix}...)</label>
+                  <div className="input-with-icon">
+                    <div className="input-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    </div>
+                    <input 
+                      type={showPassword ? "text" : "password"} 
+                      value={inputKey}
+                      onChange={(e) => {
+                        setInputKey(e.target.value);
+                        setTestStatus('idle');
+                      }}
+                      placeholder={`Ej: ${app.keyPrefix.split(' ')[0]}xxxxxxxx`} 
+                      autoComplete="new-password"
+                      style={{ paddingRight: '2.5rem' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: '1rem',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#94a3b8',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {showPassword ? '🙈' : '👁️'}
+                    </button>
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={!hasActiveTargetApps}
-                  style={{
-                    background: hasActiveTargetApps ? app.color : '#cbd5e1',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '0.6rem 1.2rem',
-                    borderRadius: '6px',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    cursor: hasActiveTargetApps ? 'pointer' : 'not-allowed',
-                    alignSelf: 'flex-start',
-                    boxShadow: `0 4px 10px rgba(0, 0, 0, 0.05)`
-                  }}
-                >
-                  ⚡ Guardar Conexión
-                </button>
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                  <button 
+                    type="button" 
+                    onClick={handleTestConnection}
+                    className="btn-test-connection"
+                  >
+                    Probar Conexión
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="btn-brand-teal"
+                    disabled={isSaving}
+                  >
+                    {isSaving ? 'Guardando...' : 'Guardar Key'}
+                  </button>
+                </div>
               </form>
 
-              {/* Active Rules List */}
-              <div style={{
-                marginTop: '0.5rem',
-                borderTop: '1px solid #e2e8f0',
-                paddingTop: '1rem'
-              }}>
-                <h5 style={{ margin: '0 0 0.75rem', fontSize: '0.9rem', color: '#0f172a', fontWeight: 700 }}>
-                  Flujos de Conexión Activos para {app.name}
-                </h5>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {currentAppRules.length === 0 ? (
-                    <div style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', padding: '1rem', background: '#f8fafc', borderRadius: '8px' }}>
-                      No tienes reglas creadas para esta app. Configura una nueva arriba 👆
-                    </div>
-                  ) : (
-                    currentAppRules.map((rule) => {
-                      const srcAppObj = ALL_APPS[rule.sourceApp];
-                      const targetAppObj = ALL_APPS[rule.targetApp];
-                      const trigName = srcAppObj?.triggers[rule.triggerIdx]?.name || 'Disparador';
-                      const actName = targetAppObj?.actions[rule.actionIdx]?.name || 'Acción';
-                      
-                      return (
-                        <div key={rule.id} style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '0.75rem',
-                          background: '#f8fafc',
-                          borderRadius: '8px',
-                          border: '1px solid #e2e8f0'
-                        }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#3b82f6' }}>
-                                {APP_NAMES_MAP[rule.sourceApp]}
-                              </span>
-                              <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>➔</span>
-                              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#10b981' }}>
-                                {APP_NAMES_MAP[rule.targetApp]}
-                              </span>
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: '#334155' }}>
-                              <strong>Si:</strong> {trigName} <strong>➔ Hacer:</strong> {actName}
-                            </div>
-                            {/* Mappings description */}
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem', marginTop: '0.15rem' }}>
-                              {Object.entries(rule.mappings).map(([k, v]) => {
-                                const isFld = rule.mappingTypes[k] === 'field';
-                                return (
-                                  <span key={k} style={{
-                                    fontSize: '0.6rem',
-                                    background: '#e2e8f0',
-                                    color: '#475569',
-                                    padding: '0.1rem 0.3rem',
-                                    borderRadius: '3px',
-                                    fontFamily: 'monospace'
-                                  }}>
-                                    {k} = {isFld ? `🔗 ${v}` : `"${v}"`}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleTestRuleTrigger(rule)}
-                              style={{
-                                background: '#eff6ff',
-                                border: '1px solid #bfdbfe',
-                                color: '#2563eb',
-                                padding: '0.25rem 0.6rem',
-                                borderRadius: '6px',
-                                fontSize: '0.7rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.2rem'
-                              }}
-                            >
-                              🧪 Probar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleToggleRule(rule.id)}
-                              className={`switch-toggle ${rule.isActive ? 'active' : ''}`}
-                              style={{ transform: 'scale(0.8)' }}
-                            >
-                              <div className="switch-handle"></div>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteRule(rule.id)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: '#ef4444',
-                                cursor: 'pointer',
-                                fontSize: '1rem',
-                                padding: '0.2rem'
-                              }}
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
+              {/* Test Results Output */}
+              {testStatus !== 'idle' && (
+                <div className={`test-results-log ${testStatus}`}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                    <span>RESULTADOS DEL TEST:</span>
+                    <span>
+                      {testStatus === 'loading' && '⌛ Probando...'}
+                      {testStatus === 'success' && '✅ Conexión Exitosa'}
+                      {testStatus === 'error' && '❌ Falló la Conexión'}
+                    </span>
+                  </div>
+                  <div style={{ maxHeight: '120px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    {testLog.map((log, idx) => (
+                      <div key={idx}>&gt; {log}</div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
+          )}
 
-            {/* Modal Footer */}
-            <div className="modal-footer" style={{
-              padding: '1.25rem 1.5rem',
-              borderTop: '1px solid #f1f5f9',
-              background: '#f8fafc',
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '0.5rem'
-            }}>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="btn-test-connection"
-                style={{
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  color: '#475569',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '8px',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                Cerrar Panel
-              </button>
-            </div>
-          </div>
         </div>
       )}
+
     </div>
   );
 }
