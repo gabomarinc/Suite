@@ -472,13 +472,79 @@ export async function POST(req: Request) {
           });
           executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });
         }
-      } else if (targetApp === 'reactivaleads') {
-        const actionConfig = ALL_APPS.reactivaleads?.actions[rule.actionIdx];
-        const actionName = actionConfig?.name || 'Acción en Reactivaleads';
-        const reactivaUrl = process.env.NEXT_PUBLIC_REACTIVALEADS_URL || 'https://reactivaleads.konsul.digital';
+      } else if (targetApp === 'reactivaleads' || targetApp === 'leadshub') {
+        const appCfg = ALL_APPS[targetApp] || ALL_APPS.reactivaleads;
+        const actionConfig = appCfg?.actions[rule.actionIdx];
+        const actionName = actionConfig?.name || 'Acción en LeadsHUB';
+        const leadshubUrl = process.env.NEXT_PUBLIC_LEADSHUB_URL || process.env.NEXT_PUBLIC_REACTIVALEADS_URL || 'https://leadshub.konsul.digital';
+
+        // Select endpoint and formatted payload according to action
+        let endpoint = `${leadshubUrl}/api/v1/contacts`;
+        let requestBody: any = { action: actionName, variables: resolvedVariables };
+
+        if (actionName.includes('Mensaje Proactivo') || actionName.includes('WhatsApp')) {
+          endpoint = `${leadshubUrl}/api/v1/messages/send`;
+          requestBody = {
+            to: resolvedVariables['Teléfono del Lead'] || resolvedVariables['Teléfono del Cliente'] || resolvedVariables['Teléfono'] || '',
+            message: resolvedVariables['Mensaje a Enviar'] || resolvedVariables['Notas'] || '',
+            mediaUrl: resolvedVariables['Documento Adjunto (URL / PDF)'] || resolvedVariables['Documento Adjunto (URL)'] || '',
+            contactName: resolvedVariables['Nombre del Lead'] || resolvedVariables['Nombre del Cliente'] || ''
+          };
+        } else if (actionName.includes('Crear o Actualizar Lead')) {
+          endpoint = `${leadshubUrl}/api/v1/contacts`;
+          requestBody = {
+            name: resolvedVariables['Nombre del Lead'] || resolvedVariables['Nombre del Cliente'] || '',
+            email: resolvedVariables['Email del Lead'] || resolvedVariables['Email del Cliente'] || '',
+            phone: resolvedVariables['Teléfono del Lead'] || resolvedVariables['Teléfono del Cliente'] || resolvedVariables['Teléfono'] || '',
+            prospectStatus: resolvedVariables['Estado de Embudo'] || 'Nuevo',
+            tags: resolvedVariables['Etiquetas (separadas por coma)'] 
+              ? resolvedVariables['Etiquetas (separadas por coma)'].split(',').map((t: string) => t.trim()) 
+              : [],
+            leadScore: resolvedVariables['Puntaje de Scoring'] ? parseInt(resolvedVariables['Puntaje de Scoring']) : undefined,
+            notes: resolvedVariables['Notas / Historial'] || resolvedVariables['Notas'] || '',
+            customData: resolvedVariables
+          };
+        } else if (actionName.includes('Mover Lead de Estado')) {
+          endpoint = `${leadshubUrl}/api/v1/contacts/status`;
+          requestBody = {
+            identifier: resolvedVariables['Teléfono o Email del Lead'] || resolvedVariables['Email del Cliente'] || resolvedVariables['Teléfono del Lead'] || '',
+            prospectStatus: resolvedVariables['Nuevo Estado de Embudo'] || 'Calificado',
+            note: resolvedVariables['Nota de Cambio de Estado'] || ''
+          };
+        } else if (actionName.includes('Añadir Etiquetas')) {
+          endpoint = `${leadshubUrl}/api/v1/contacts/tags`;
+          requestBody = {
+            identifier: resolvedVariables['Teléfono o Email del Lead'] || resolvedVariables['Email del Cliente'] || resolvedVariables['Teléfono del Lead'] || '',
+            tags: resolvedVariables['Etiquetas a Añadir'] 
+              ? resolvedVariables['Etiquetas a Añadir'].split(',').map((t: string) => t.trim()) 
+              : []
+          };
+        } else if (actionName.includes('Agendar Cita')) {
+          endpoint = `${leadshubUrl}/api/v1/calendar/events`;
+          requestBody = {
+            identifier: resolvedVariables['Teléfono o Email del Lead'] || resolvedVariables['Email del Cliente'] || '',
+            title: resolvedVariables['Título de Cita'] || 'Reunión Comercial',
+            startTime: resolvedVariables['Fecha y Hora de Inicio'] || new Date().toISOString(),
+            durationMinutes: resolvedVariables['Duración en Minutos'] ? parseInt(resolvedVariables['Duración en Minutos']) : 30,
+            location: resolvedVariables['Enlace de Reunión / Ubicación'] || ''
+          };
+        } else if (actionName.includes('Registrar Nota')) {
+          endpoint = `${leadshubUrl}/api/v1/contacts/activity`;
+          requestBody = {
+            identifier: resolvedVariables['Teléfono o Email del Lead'] || resolvedVariables['Email del Cliente'] || '',
+            type: 'NOTE',
+            content: resolvedVariables['Contenido de la Nota / Actividad'] || ''
+          };
+        } else if (actionName.includes('Asignar Asesor')) {
+          endpoint = `${leadshubUrl}/api/v1/conversations/assign`;
+          requestBody = {
+            identifier: resolvedVariables['Teléfono o Email del Lead'] || resolvedVariables['Email del Cliente'] || '',
+            assignee: resolvedVariables['Email o Nombre del Asesor'] || ''
+          };
+        }
 
         try {
-          const response = await fetch(`${reactivaUrl}/api/v1/leads`, {
+          const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -487,17 +553,14 @@ export async function POST(req: Request) {
               'x-user-email': userEmail,
               'x-user-name': userName
             },
-            body: JSON.stringify({
-              action: actionName,
-              variables: resolvedVariables
-            })
+            body: JSON.stringify(requestBody)
           });
 
           let resData: any = {};
           try {
             resData = await response.json();
           } catch (e) {
-            resData = { message: 'Respuesta recibida de Reactivaleads' };
+            resData = { message: 'Respuesta recibida de LeadsHUB' };
           }
 
           const isSuccess = response.ok;
@@ -510,8 +573,8 @@ export async function POST(req: Request) {
               triggerName,
               actionName,
               status: isSuccess ? 'SUCCESS' : 'FAILED',
-              errorDetails: isSuccess ? null : (resData.error?.message || resData.error || 'Error al procesar acción en Reactivaleads'),
-              payloadSent: resolvedVariables,
+              errorDetails: isSuccess ? null : (resData.error?.message || resData.error || 'Error al procesar acción en LeadsHUB'),
+              payloadSent: requestBody,
               responseRec: resData
             }
           });
@@ -526,8 +589,8 @@ export async function POST(req: Request) {
               triggerName,
               actionName,
               status: 'FAILED',
-              errorDetails: fetchErr.message || 'Error de conexión con Reactivaleads',
-              payloadSent: resolvedVariables,
+              errorDetails: fetchErr.message || 'Error de conexión con LeadsHUB',
+              payloadSent: requestBody,
               responseRec: Prisma.DbNull
             }
           });

@@ -298,47 +298,121 @@ export const ALL_APPS: Record<string, AppConfig> = {
     ]
   },
   reactivaleads: {
-    name: 'Kônsul Reactivaleads',
+    name: 'Kônsul LeadsHUB',
     code: 'reactivaleads',
     triggers: [
       { 
-        name: 'Nuevo Lead Registrado', 
-        description: 'Se dispara al capturar un lead de formulario o chat.', 
+        name: 'Nuevo Lead Registrado (Chat / Form)', 
+        description: 'Se dispara al capturar un nuevo prospecto o contacto desde WhatsApp, formulario o chat web.', 
         outputs: [
           'ID del Lead',
           'Nombre del Lead', 
           'Email del Lead', 
           'Teléfono del Lead',
-          'Empresa / Organización',
           'Origen / Canal',
+          'Estado de Embudo',
+          'Puntaje de Scoring',
+          'Etiquetas del Lead',
+          'Resumen de IA',
           'Notas / Mensaje',
           'Fecha de Registro'
         ] 
       },
       { 
-        name: 'Lead Calificado', 
-        description: 'Se dispara al alcanzar un score crediticio o comercial mínimo.', 
+        name: 'Estado de Prospecto Cambiado (Embudo Kanban)', 
+        description: 'Se dispara cuando un prospecto se mueve a una nueva columna del embudo comercial (ej. Calificado, Cotización, Ganado).', 
         outputs: [
           'ID del Lead',
           'Nombre del Lead', 
           'Email del Lead', 
           'Teléfono del Lead',
-          'Empresa / Organización',
+          'Nuevo Estado de Embudo',
+          'Estado Anterior',
           'Puntaje de Scoring',
-          'Notas / Mensaje'
+          'Asesor Asignado',
+          'Resumen de IA',
+          'Fecha de Actualización'
+        ] 
+      },
+      { 
+        name: 'Cita o Reunión Agendada', 
+        description: 'Se dispara cuando el agente de IA o un asesor agenda una cita en el calendario.', 
+        outputs: [
+          'ID de Cita',
+          'Título de Cita',
+          'Nombre del Lead',
+          'Email del Lead',
+          'Teléfono del Lead',
+          'Fecha y Hora de Inicio',
+          'Fecha y Hora de Fin',
+          'Enlace de Reunión / Ubicación',
+          'Categoría de Cita'
+        ] 
+      },
+      { 
+        name: 'Conversación Transferida a Humano (Handoff)', 
+        description: 'Se dispara cuando el agente de IA transfiere la conversación a un asesor humano o el cliente solicita ayuda.', 
+        outputs: [
+          'ID de Conversación',
+          'Nombre del Lead',
+          'Email del Lead',
+          'Teléfono del Lead',
+          'Canal (WhatsApp / Instagram / Web)',
+          'Motivo de Transferencia',
+          'Asesor Asignado',
+          'Último Mensaje del Cliente'
+        ] 
+      },
+      { 
+        name: 'Intención Comercial Detectada por IA', 
+        description: 'Se dispara cuando el agente clasifica que el lead tiene alta intención de compra o solicita cotización.', 
+        outputs: [
+          'ID del Lead',
+          'Nombre del Lead',
+          'Email del Lead',
+          'Teléfono del Lead',
+          'Servicio o Producto de Interés',
+          'Presupuesto Mencionado',
+          'Nivel de Urgencia',
+          'Resumen de Necesidad'
         ] 
       }
     ],
     actions: [
       { 
-        name: 'Crear o Importar Lead', 
-        description: 'Inserta un nuevo prospecto en la base de datos central.', 
-        fields: ['Nombre del Lead', 'Email del Lead', 'Teléfono del Lead', 'Empresa / Organización', 'Notas'] 
+        name: 'Crear o Actualizar Lead en CRM', 
+        description: 'Inserta o sincroniza los datos de un prospecto en el CRM central de LeadsHUB.', 
+        fields: ['Nombre del Lead', 'Email del Lead', 'Teléfono del Lead', 'Estado de Embudo', 'Etiquetas (separadas por coma)', 'Notas / Historial', 'Puntaje de Scoring'] 
       },
       { 
-        name: 'Asignar Agente', 
-        description: 'Asigna un prospecto a un asesor.', 
-        fields: ['Email del Lead', 'Email del Asesor/Agente'] 
+        name: 'Enviar Mensaje Proactivo (WhatsApp / Canal)', 
+        description: 'Envía un mensaje personalizado al cliente por WhatsApp o su canal activo mediante el agente de IA.', 
+        fields: ['Teléfono del Lead', 'Mensaje a Enviar', 'Documento Adjunto (URL / PDF)', 'Nombre del Lead'] 
+      },
+      { 
+        name: 'Mover Lead de Estado de Embudo', 
+        description: 'Actualiza la etapa o columna del pipeline Kanban para el prospecto.', 
+        fields: ['Teléfono o Email del Lead', 'Nuevo Estado de Embudo', 'Nota de Cambio de Estado'] 
+      },
+      { 
+        name: 'Añadir Etiquetas a Lead', 
+        description: 'Asigna etiquetas de segmentación al contacto en el CRM (ej. Facturado, VIP).', 
+        fields: ['Teléfono o Email del Lead', 'Etiquetas a Añadir'] 
+      },
+      { 
+        name: 'Agendar Cita en Calendario', 
+        description: 'Crea un evento o reunión agendada vinculada al contacto y al agente.', 
+        fields: ['Teléfono o Email del Lead', 'Título de Cita', 'Fecha y Hora de Inicio', 'Duración en Minutos', 'Enlace de Reunión / Ubicación'] 
+      },
+      { 
+        name: 'Registrar Nota en Bitácora del Lead', 
+        description: 'Agrega una nota en la línea de tiempo de actividades del contacto en LeadsHUB.', 
+        fields: ['Teléfono o Email del Lead', 'Contenido de la Nota / Actividad'] 
+      },
+      { 
+        name: 'Asignar Asesor a Conversación', 
+        description: 'Asigna el contacto y su chat a un asesor humano específico del equipo.', 
+        fields: ['Teléfono o Email del Lead', 'Email o Nombre del Asesor'] 
       }
     ]
   },
@@ -429,10 +503,19 @@ export const ALL_APPS: Record<string, AppConfig> = {
   }
 };
 
+// Aliasing leadshub to reactivaleads for complete backwards/forwards compatibility
+ALL_APPS.leadshub = {
+  ...ALL_APPS.reactivaleads,
+  code: 'leadshub',
+  name: 'Kônsul LeadsHUB'
+};
+
 export const APP_NAMES_MAP: Record<string, string> = {
   bills: 'Kônsul Bills',
   process: 'Kônsul Process',
-  reactivaleads: 'Kônsul Reactivaleads',
+  leadshub: 'Kônsul LeadsHUB',
+  reactivaleads: 'Kônsul LeadsHUB',
   kredit: 'Kônsul Kredit',
   mailing: 'Kônsul Mailing'
 };
+

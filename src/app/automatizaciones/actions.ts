@@ -152,6 +152,7 @@ export async function testIntegration(appCode: string, serviceKey: string) {
     bills: ['kb_live_', 'kb_svc_', 'kb_test_', 'konsul_sso_'],
     process: ['kp_live_', 'kp_svc_', 'kp_test_', 'konsul_sso_'],
     reactivaleads: ['lh_live_', 'lh_svc_', 'lh_test_', 'konsul_sso_'],
+    leadshub: ['lh_live_', 'lh_svc_', 'lh_test_', 'konsul_sso_'],
     kredit: ['kk_live_', 'kk_svc_', 'kk_test_', 'konsul_sso_'],
     mailing: ['km_live_', 'km_svc_', 'km_test_', 'konsul_sso_']
   };
@@ -198,8 +199,8 @@ export async function testIntegration(appCode: string, serviceKey: string) {
       } else {
         logs.push(`[GET] /api/v1/summary -> Respuesta HTTP: ${res.status}`);
       }
-    } else if (appCode === 'reactivaleads') {
-      logs.push(`Reactivaleads API v1 operativa y lista para sincronizar prospectos y campañas.`);
+    } else if (appCode === 'reactivaleads' || appCode === 'leadshub') {
+      logs.push(`LeadsHUB API v1 conectada y lista para sincronizar leads CRM, agentes IA y mensajería WhatsApp.`);
     } else if (appCode === 'kredit') {
       logs.push(`Kredit API v1 operativa y lista para procesar evaluaciones y solicitudes de riesgo.`);
     }

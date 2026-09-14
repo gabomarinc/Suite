@@ -354,25 +354,25 @@ export default async function DashboardHub() {
           </div>
         </a>
 
-        {/* Reactivaleads Card */}
+        {/* LeadsHUB Card */}
         <a href="https://reactivaleads.konsul.digital/api/auth/login?prompt=none" className="card card-reactivaleads">
           <div className="card-header-suite">
             <div className="card-suite-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><line x1="9" y1="10" x2="15" y2="10"></line></svg>
             </div>
             <span className="card-badge-status">
               Conectado
             </span>
           </div>
           <div className="card-body">
-            <h3>Kônsul Reactivaleads</h3>
-            <p>Captación inteligente de clientes potenciales mediante embudos automatizados de email marketing y seguimiento multicanal.</p>
+            <h3>Kônsul LeadsHUB</h3>
+            <p>Agentes de IA autónomos, mensajería omnicanal por WhatsApp e Instagram, y gestión de embudos CRM.</p>
           </div>
           <div className="card-footer-suite">
             <div className="quick-links">
-              <span className="quick-link-btn">Campañas</span>
-              <span className="quick-link-btn">Leads</span>
-              <span className="quick-link-btn">Embudos</span>
+              <span className="quick-link-btn">Agentes IA</span>
+              <span className="quick-link-btn">CRM Leads</span>
+              <span className="quick-link-btn">WhatsApp</span>
             </div>
             <div className="arrow-suite-btn">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>

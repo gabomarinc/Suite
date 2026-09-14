@@ -375,16 +375,37 @@ export default function IntegrationCard({
           'Enlace de Factura en Bills': 'https://bills.konsul.digital?invoiceId=FAC-2026-0042'
         };
       }
-    } else if (rule.sourceApp === 'reactivaleads') {
+    } else if (rule.sourceApp === 'reactivaleads' || rule.sourceApp === 'leadshub') {
       mockData = {
-        'ID del Lead': 'lead_auto_101',
+        'ID del Lead': 'lead_lh_8892',
         'Nombre del Lead': 'Carlos Rodríguez',
         'Email del Lead': 'carlos.rodriguez@empresa.com',
         'Teléfono del Lead': '+507 6555-8888',
-        'Empresa / Organización': 'Logística Global S.A.',
-        'Origen / Canal': 'Campaña Meta Ads Q3',
+        'Origen / Canal': 'WhatsApp Business',
+        'Estado de Embudo': 'Calificado',
+        'Nuevo Estado de Embudo': 'Ganado',
+        'Estado Anterior': 'Cotización',
         'Puntaje de Scoring': '95',
-        'Notas / Mensaje': 'Solicita integración con su sistema contable'
+        'Etiquetas del Lead': 'VIP, Corporativo',
+        'Resumen de IA': 'Cliente interesado en automatizar facturación y flujos con agentes de IA',
+        'Notas / Mensaje': 'Solicita integración con su sistema contable',
+        'Fecha de Registro': new Date().toISOString(),
+        'Fecha de Actualización': new Date().toISOString(),
+        'ID de Cita': 'meet_lh_401',
+        'Título de Cita': 'Demostración Comercial Kônsul',
+        'Fecha y Hora de Inicio': new Date(Date.now() + 86400000).toISOString(),
+        'Fecha y Hora de Fin': new Date(Date.now() + 90000000).toISOString(),
+        'Enlace de Reunión / Ubicación': 'https://meet.google.com/xyz-abcd-efg',
+        'Categoría de Cita': 'Demostración',
+        'ID de Conversación': 'conv_lh_900',
+        'Canal (WhatsApp / Instagram / Web)': 'WhatsApp',
+        'Motivo de Transferencia': 'Solicita descuento comercial y cierre de contrato',
+        'Asesor Asignado': 'Gabriel Marín',
+        'Último Mensaje del Cliente': 'Me interesa avanzar hoy mismo',
+        'Servicio o Producto de Interés': 'Suite Empresarial + Facturación',
+        'Presupuesto Mencionado': '$500/mes',
+        'Nivel de Urgencia': 'Alto',
+        'Resumen de Necesidad': 'Automatizar emisión de facturas y cobros vía WhatsApp'
       };
     } else {
       mockData = {

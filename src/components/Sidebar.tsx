@@ -95,7 +95,7 @@ export default function Sidebar({ user, isLocked = false }: SidebarProps) {
       isExternal: true
     },
     {
-      name: 'Reactivaleads (Leads)',
+      name: 'LeadsHUB (Chat & CRM)',
       href: 'https://reactivaleads.konsul.digital/api/auth/login?prompt=none',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
