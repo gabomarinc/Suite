@@ -1070,7 +1070,7 @@ export async function retryAutomationLog(logId: string) {
   }
 
   // Get the active integration for targetApp
-  const targetIntegration = await prisma.integration.findUnique({
+  let targetIntegration = await prisma.integration.findUnique({
     where: {
       userId_appCode: {
         userId: user.id,
@@ -1078,6 +1078,18 @@ export async function retryAutomationLog(logId: string) {
       }
     }
   });
+
+  if (!targetIntegration && log.targetApp === 'bills') {
+    targetIntegration = {
+      id: 'auto_bills_' + user.id,
+      userId: user.id,
+      appCode: log.targetApp,
+      serviceKey: 'konsul_sso_bills',
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+  }
 
   if (!targetIntegration || !targetIntegration.isActive || !targetIntegration.serviceKey) {
     throw new Error(`La integración destino ${log.targetApp} no está activa o le falta la API Key`);
@@ -1233,8 +1245,9 @@ export async function retryAutomationLog(logId: string) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': targetIntegration.serviceKey || process.env.INTERNAL_API_KEY || 'konsul_ecosystem_secret_key',
-          'x-user-id': user.id
+          'x-api-key': targetIntegration.serviceKey || 'konsul_sso_bills',
+          'x-user-id': user.id,
+          'x-user-email': user.email || ''
         },
         body: JSON.stringify(log.payloadSent)
       });

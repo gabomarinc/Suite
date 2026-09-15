@@ -380,6 +380,18 @@ export async function POST(req: Request) {
         };
       }
 
+      if (!targetIntegration && targetApp === 'bills') {
+        targetIntegration = {
+          id: 'auto_bills_' + rule.userId,
+          userId: rule.userId,
+          appCode: targetApp,
+          serviceKey: 'konsul_sso_bills',
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+      }
+
       if (!targetIntegration || !targetIntegration.isActive || !targetIntegration.serviceKey) {
         // Record failure
         const log = await prisma.automationLog.create({
@@ -574,7 +586,7 @@ export async function POST(req: Request) {
             method,
             headers: {
               'Content-Type': 'application/json',
-              'x-api-key': targetIntegration.serviceKey,
+              'x-api-key': targetIntegration.serviceKey || 'konsul_sso_bills',
               'x-user-id': rule.userId,
               'x-user-email': userEmail
             },
