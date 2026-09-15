@@ -303,7 +303,7 @@ export const ALL_APPS: Record<string, AppConfig> = {
     triggers: [
       { 
         name: 'Nuevo Lead Registrado (Chat / Form)', 
-        description: 'Se dispara al capturar un nuevo prospecto o contacto desde WhatsApp, formulario o chat web.', 
+        description: 'Se dispara al crearse un nuevo contacto o lead en LeadsHUB (chat, WhatsApp o formulario). [contact:created]', 
         outputs: [
           'ID del Lead',
           'Nombre del Lead', 
@@ -320,14 +320,14 @@ export const ALL_APPS: Record<string, AppConfig> = {
       },
       { 
         name: 'Estado de Prospecto Cambiado (Embudo Kanban)', 
-        description: 'Se dispara cuando un prospecto se mueve a una nueva columna del embudo comercial (ej. Calificado, Cotización, Ganado).', 
+        description: 'Se dispara cuando un prospecto cambia de columna en el embudo Kanban. [contact:status_changed]', 
         outputs: [
           'ID del Lead',
           'Nombre del Lead', 
           'Email del Lead', 
           'Teléfono del Lead',
-          'Nuevo Estado de Embudo',
           'Estado Anterior',
+          'Nuevo Estado de Embudo',
           'Puntaje de Scoring',
           'Asesor Asignado',
           'Resumen de IA',
@@ -335,32 +335,78 @@ export const ALL_APPS: Record<string, AppConfig> = {
         ] 
       },
       { 
+        name: 'Etiqueta Añadida a Lead', 
+        description: 'Se dispara cuando se añade una o más etiquetas nuevas al contacto en el CRM. [contact:tag_added]', 
+        outputs: [
+          'ID del Lead',
+          'Nombre del Lead', 
+          'Email del Lead', 
+          'Teléfono del Lead',
+          'Etiquetas Nuevas Añadidas',
+          'Etiquetas Totales del Lead',
+          'Estado de Embudo',
+          'Puntaje de Scoring',
+          'Fecha de Actualización'
+        ] 
+      },
+      { 
+        name: 'Nueva Actividad o Nota Registrada', 
+        description: 'Se dispara al registrarse una nueva nota, tarea o actividad en la bitácora del contacto. [contact:activity_added]', 
+        outputs: [
+          'ID de Actividad',
+          'Tipo de Actividad',
+          'Texto / Contenido de la Actividad',
+          'Fecha de Actividad',
+          'ID del Lead',
+          'Nombre del Lead', 
+          'Email del Lead', 
+          'Teléfono del Lead',
+          'Estado de Embudo'
+        ] 
+      },
+      { 
         name: 'Cita o Reunión Agendada', 
-        description: 'Se dispara cuando el agente de IA o un asesor agenda una cita en el calendario.', 
+        description: 'Se dispara cuando el agente de IA o un asesor agenda una cita en el calendario. [calendar:event_created]', 
         outputs: [
           'ID de Cita',
           'Título de Cita',
-          'Nombre del Lead',
-          'Email del Lead',
-          'Teléfono del Lead',
           'Fecha y Hora de Inicio',
           'Fecha y Hora de Fin',
           'Enlace de Reunión / Ubicación',
+          'Nombre del Lead',
+          'Email del Lead',
+          'Teléfono del Lead',
           'Categoría de Cita'
         ] 
       },
       { 
         name: 'Conversación Transferida a Humano (Handoff)', 
-        description: 'Se dispara cuando el agente de IA transfiere la conversación a un asesor humano o el cliente solicita ayuda.', 
+        description: 'Se dispara cuando el bot transfiere la conversación a un asesor humano o el cliente solicita ayuda. [conversation:handoff_requested]', 
         outputs: [
           'ID de Conversación',
+          'ID del Lead',
           'Nombre del Lead',
           'Email del Lead',
           'Teléfono del Lead',
-          'Canal (WhatsApp / Instagram / Web)',
-          'Motivo de Transferencia',
+          'Departamento / Motivo',
           'Asesor Asignado',
+          'Canal (WhatsApp / Instagram / Web)',
           'Último Mensaje del Cliente'
+        ] 
+      },
+      { 
+        name: 'Conversación Cerrada o Resuelta', 
+        description: 'Se dispara cuando una conversación en WhatsApp o canal finaliza o se marca como resuelta. [conversation:closed]', 
+        outputs: [
+          'ID de Conversación',
+          'ID del Lead',
+          'Nombre del Lead',
+          'Email del Lead',
+          'Teléfono del Lead',
+          'Estado de Conversación',
+          'Estado de Embudo',
+          'Resumen de IA',
+          'Fecha de Cierre'
         ] 
       },
       { 
@@ -368,8 +414,8 @@ export const ALL_APPS: Record<string, AppConfig> = {
         description: 'Se dispara cuando el agente clasifica que el lead tiene alta intención de compra o solicita cotización.', 
         outputs: [
           'ID del Lead',
-          'Nombre del Lead',
-          'Email del Lead',
+          'Nombre del Lead', 
+          'Email del Lead', 
           'Teléfono del Lead',
           'Servicio o Producto de Interés',
           'Presupuesto Mencionado',

@@ -37,85 +37,132 @@ export async function POST(req: Request) {
     let userId = rawBody.userId;
     let data = rawBody.data || {};
 
-    // --- SUPPORT FOR LEADSHUB WEBHOOK CONTRACT (Section 01) ---
+    // --- SUPPORT FOR LEADSHUB WEBHOOK CONTRACT (7 Official Triggers) ---
     // If incoming request is from LeadsHUB via contract:
     // Headers: x-source-app: leadshub, x-api-key, x-workspace-id
-    // Body: { event: "contact:created", timestamp: "...", data: { ... } }
+    // Body: { event: "contact:created | contact:status_changed | contact:tag_added | contact:activity_added | calendar:event_created | conversation:handoff_requested | conversation:closed", timestamp: "...", data: { ... } }
     if (sourceAppHeader === 'leadshub' || sourceAppHeader === 'reactivaleads' || rawBody.event) {
       appCode = 'leadshub';
       const event = rawBody.event || '';
+      const rawData = rawBody.data || {};
+      const contact = (typeof rawData.contact === 'object' && rawData.contact !== null) ? rawData.contact : rawData;
 
       if (event === 'contact:created' || event === 'lead.created') {
         triggerName = 'Nuevo Lead Registrado (Chat / Form)';
         data = {
-          'ID del Lead': data.contactId || data.id || '',
-          'Nombre del Lead': data.name || data.contactName || '',
-          'Email del Lead': data.email || data.contactEmail || '',
-          'Teléfono del Lead': data.phone || data.contactPhone || '',
-          'Origen / Canal': data.channel || 'WhatsApp',
-          'Estado de Embudo': data.status || data.prospectStatus || 'Nuevo',
-          'Puntaje de Scoring': String(data.leadScore || data.score || '50'),
-          'Etiquetas del Lead': Array.isArray(data.tags) ? data.tags.join(', ') : (data.tags || ''),
-          'Resumen de IA': data.summary || data.aiSummary || '',
-          'Notas / Mensaje': data.notes || data.message || '',
-          'Fecha de Registro': rawBody.timestamp || new Date().toISOString(),
-          ...data
+          'ID del Lead': contact.id || contact.contactId || '',
+          'Nombre del Lead': contact.name || contact.contactName || '',
+          'Email del Lead': contact.email || contact.contactEmail || '',
+          'Teléfono del Lead': contact.phone || contact.contactPhone || '',
+          'Origen / Canal': rawData.channel || contact.channel || contact.source || 'WhatsApp',
+          'Estado de Embudo': contact.prospectStatus || contact.status || 'Nuevo',
+          'Puntaje de Scoring': String(contact.leadScore || contact.score || '50'),
+          'Etiquetas del Lead': Array.isArray(contact.tags) ? contact.tags.join(', ') : (contact.tags || ''),
+          'Resumen de IA': contact.summary || contact.aiSummary || '',
+          'Notas / Mensaje': contact.notes || contact.message || '',
+          'Fecha de Registro': rawBody.timestamp || contact.createdAt || new Date().toISOString(),
+          ...rawData
         };
       } else if (event === 'contact:status_changed' || event === 'lead.status_changed') {
         triggerName = 'Estado de Prospecto Cambiado (Embudo Kanban)';
         data = {
-          'ID del Lead': data.contactId || data.id || '',
-          'Nombre del Lead': data.name || data.contactName || '',
-          'Email del Lead': data.email || data.contactEmail || '',
-          'Teléfono del Lead': data.phone || data.contactPhone || '',
-          'Estado Anterior': data.prevStatus || '',
-          'Nuevo Estado de Embudo': data.newStatus || '',
-          'Puntaje de Scoring': String(data.leadScore || data.score || ''),
-          'Asesor Asignado': data.assignedTo || '',
-          'Resumen de IA': data.summary || '',
+          'ID del Lead': contact.id || contact.contactId || '',
+          'Nombre del Lead': contact.name || contact.contactName || '',
+          'Email del Lead': contact.email || contact.contactEmail || '',
+          'Teléfono del Lead': contact.phone || contact.contactPhone || '',
+          'Estado Anterior': rawData.prevStatus || '',
+          'Nuevo Estado de Embudo': rawData.newStatus || contact.prospectStatus || '',
+          'Puntaje de Scoring': String(contact.leadScore || contact.score || ''),
+          'Asesor Asignado': contact.assignedTo || rawData.assignedTo || '',
+          'Resumen de IA': contact.summary || '',
           'Fecha de Actualización': rawBody.timestamp || new Date().toISOString(),
-          ...data
+          ...rawData
+        };
+      } else if (event === 'contact:tag_added') {
+        triggerName = 'Etiqueta Añadida a Lead';
+        const addedTagsStr = Array.isArray(rawData.addedTags) ? rawData.addedTags.join(', ') : (rawData.addedTags || '');
+        const allTagsStr = Array.isArray(contact.tags) ? contact.tags.join(', ') : (contact.tags || addedTagsStr);
+        data = {
+          'ID del Lead': contact.id || contact.contactId || '',
+          'Nombre del Lead': contact.name || '',
+          'Email del Lead': contact.email || '',
+          'Teléfono del Lead': contact.phone || '',
+          'Etiquetas Nuevas Añadidas': addedTagsStr,
+          'Etiquetas Totales del Lead': allTagsStr,
+          'Estado de Embudo': contact.prospectStatus || contact.status || '',
+          'Puntaje de Scoring': String(contact.leadScore || ''),
+          'Fecha de Actualización': rawBody.timestamp || new Date().toISOString(),
+          ...rawData
+        };
+      } else if (event === 'contact:activity_added') {
+        triggerName = 'Nueva Actividad o Nota Registrada';
+        const act = rawData.activity || {};
+        data = {
+          'ID de Actividad': act.id || '',
+          'Tipo de Actividad': act.type || act.tipo || 'Nota',
+          'Texto / Contenido de la Actividad': act.content || act.text || act.texto || '',
+          'Fecha de Actividad': act.createdAt || act.date || act.fecha || rawBody.timestamp || new Date().toISOString(),
+          'ID del Lead': contact.id || contact.contactId || '',
+          'Nombre del Lead': contact.name || '',
+          'Email del Lead': contact.email || '',
+          'Teléfono del Lead': contact.phone || '',
+          'Estado de Embudo': contact.prospectStatus || contact.status || '',
+          ...rawData
         };
       } else if (event === 'calendar:event_created' || event === 'meeting.created') {
         triggerName = 'Cita o Reunión Agendada';
         data = {
-          'ID de Cita': data.eventId || data.id || '',
-          'Título de Cita': data.title || 'Cita Agendada por Agente',
-          'Nombre del Lead': data.contactName || data.name || '',
-          'Email del Lead': data.contactEmail || data.email || '',
-          'Teléfono del Lead': data.contactPhone || data.phone || '',
-          'Fecha y Hora de Inicio': data.startTime || '',
-          'Fecha y Hora de Fin': data.endTime || '',
-          'Enlace de Reunión / Ubicación': data.location || data.meetUrl || '',
-          'Categoría de Cita': data.category || 'Demostración',
-          ...data
+          'ID de Cita': rawData.eventId || rawData.id || '',
+          'Título de Cita': rawData.title || 'Cita Agendada por Agente',
+          'Fecha y Hora de Inicio': rawData.startTime || '',
+          'Fecha y Hora de Fin': rawData.endTime || '',
+          'Enlace de Reunión / Ubicación': rawData.location || rawData.meetUrl || '',
+          'Nombre del Lead': contact.name || rawData.contactName || '',
+          'Email del Lead': contact.email || rawData.contactEmail || '',
+          'Teléfono del Lead': contact.phone || rawData.contactPhone || '',
+          'Categoría de Cita': rawData.category || 'Demostración',
+          ...rawData
         };
       } else if (event === 'conversation:handoff_requested' || event === 'chat.handoff') {
         triggerName = 'Conversación Transferida a Humano (Handoff)';
         data = {
-          'ID de Conversación': data.conversationId || data.id || '',
-          'ID del Lead': data.contactId || '',
-          'Nombre del Lead': data.contactName || data.name || '',
-          'Email del Lead': data.contactEmail || data.email || '',
-          'Teléfono del Lead': data.contactPhone || data.phone || '',
-          'Canal (WhatsApp / Instagram / Web)': data.channel || 'WhatsApp',
-          'Motivo de Transferencia': data.department || data.reason || 'Solicita atención humana',
-          'Asesor Asignado': data.assignedTo || '',
-          'Último Mensaje del Cliente': data.lastMessage || data.message || '',
-          ...data
+          'ID de Conversación': rawData.conversationId || rawData.id || '',
+          'ID del Lead': contact.id || rawData.contactId || '',
+          'Nombre del Lead': contact.name || rawData.contactName || '',
+          'Email del Lead': contact.email || rawData.contactEmail || '',
+          'Teléfono del Lead': contact.phone || rawData.contactPhone || '',
+          'Departamento / Motivo': rawData.department || rawData.reason || 'Solicita atención humana',
+          'Asesor Asignado': rawData.assignedTo || '',
+          'Canal (WhatsApp / Instagram / Web)': rawData.channel || contact.channel || 'WhatsApp',
+          'Último Mensaje del Cliente': rawData.lastMessage || rawData.message || '',
+          ...rawData
+        };
+      } else if (event === 'conversation:closed') {
+        triggerName = 'Conversación Cerrada o Resuelta';
+        data = {
+          'ID de Conversación': rawData.conversationId || rawData.id || '',
+          'ID del Lead': contact.id || rawData.contactId || '',
+          'Nombre del Lead': contact.name || rawData.contactName || '',
+          'Email del Lead': contact.email || rawData.contactEmail || '',
+          'Teléfono del Lead': contact.phone || rawData.contactPhone || '',
+          'Estado de Conversación': rawData.status || 'Cerrada',
+          'Estado de Embudo': contact.prospectStatus || 'Resuelto',
+          'Resumen de IA': contact.summary || rawData.summary || '',
+          'Fecha de Cierre': rawBody.timestamp || new Date().toISOString(),
+          ...rawData
         };
       } else if (event === 'lead.intent_detected' || event === 'intent:detected') {
         triggerName = 'Intención Comercial Detectada por IA';
         data = {
-          'ID del Lead': data.contactId || data.id || '',
-          'Nombre del Lead': data.name || '',
-          'Email del Lead': data.email || '',
-          'Teléfono del Lead': data.phone || '',
-          'Servicio o Producto de Interés': data.service || data.interest || '',
-          'Presupuesto Mencionado': data.budget || '',
-          'Nivel de Urgencia': data.urgency || 'Alto',
-          'Resumen de Necesidad': data.summary || '',
-          ...data
+          'ID del Lead': contact.id || rawData.contactId || '',
+          'Nombre del Lead': contact.name || '',
+          'Email del Lead': contact.email || '',
+          'Teléfono del Lead': contact.phone || '',
+          'Servicio o Producto de Interés': rawData.service || rawData.interest || '',
+          'Presupuesto Mencionado': rawData.budget || '',
+          'Nivel de Urgencia': rawData.urgency || 'Alto',
+          'Resumen de Necesidad': rawData.summary || contact.summary || '',
+          ...rawData
         };
       } else if (event) {
         triggerName = event;

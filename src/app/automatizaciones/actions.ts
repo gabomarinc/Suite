@@ -220,21 +220,38 @@ export async function testIntegration(appCode: string, serviceKey: string) {
       const leadshubUrl = process.env.LEADSHUB_URL || process.env.NEXT_PUBLIC_LEADSHUB_URL || 'https://agentes.konsul.digital';
       logs.push(`LeadsHUB (${leadshubUrl}) API v1 conectada y lista para sincronizar leads CRM, agentes IA y mensajería WhatsApp.`);
       
-      // Check for real contacts
+      // Check for real contacts and calendar routes
       try {
         const contRes = await fetch(`${leadshubUrl}/api/v1/contacts`, {
-          headers: { 'x-api-key': serviceKey },
+          headers: { 'x-api-key': serviceKey, 'x-source-app': 'leadshub' },
           cache: 'no-store'
         });
         if (contRes.ok) {
+          logs.push(`[GET] ${leadshubUrl}/api/v1/contacts -> 200 OK (Servicio de Contactos En Línea)`);
           const contJson = await contRes.json();
           const contacts = Array.isArray(contJson) ? contJson : (contJson.data || contJson.contacts || []);
           if (contacts.length > 0) {
             const first = contacts[0];
             logs.push(`[DATOS REALES] Encontrados ${contacts.length} contacto(s). Último: ${first.name || 'Sin nombre'} (${first.phone || first.email || 'WhatsApp'})`);
+          } else {
+            logs.push(`[DATOS REALES] Conexión con LeadsHUB verificada exitosamente (0 contactos previos).`);
           }
+        } else if (contRes.status === 401) {
+          logs.push(`[GET] ${leadshubUrl}/api/v1/contacts -> 401 (Autenticación requerida por LeadsHUB: verifica tu API Key o Service Key).`);
+        } else {
+          logs.push(`[GET] ${leadshubUrl}/api/v1/contacts -> Respuesta HTTP: ${contRes.status}`);
         }
-      } catch {}
+
+        const calRes = await fetch(`${leadshubUrl}/api/v1/calendar/events`, {
+          headers: { 'x-api-key': serviceKey, 'x-source-app': 'leadshub' },
+          cache: 'no-store'
+        });
+        if (calRes.ok) {
+          logs.push(`[GET] ${leadshubUrl}/api/v1/calendar/events -> 200 OK (API de Calendario operativa)`);
+        }
+      } catch (e: any) {
+        logs.push(`Aviso al consultar LeadsHUB: ${e.message}`);
+      }
     } else if (appCode === 'kredit') {
       logs.push(`Kredit API v1 operativa y lista para procesar evaluaciones y solicitudes de riesgo.`);
     }
@@ -493,6 +510,12 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
             'Estado Anterior': 'Nuevo',
             'Puntaje de Scoring': String(l.leadScore || '95'),
             'Etiquetas del Lead': Array.isArray(l.tags) ? l.tags.join(', ') : (l.tags || 'VIP, Calificado'),
+            'Etiquetas Nuevas Añadidas': Array.isArray(l.tags) ? (l.tags.slice(-2).join(', ') || 'VIP') : (l.tags || 'VIP'),
+            'Etiquetas Totales del Lead': Array.isArray(l.tags) ? l.tags.join(', ') : (l.tags || 'VIP, Calificado'),
+            'ID de Actividad': l.activities?.[0]?.id || 'act_real_1',
+            'Tipo de Actividad': l.activities?.[0]?.type || l.activities?.[0]?.tipo || 'Nota en Bitácora',
+            'Texto / Contenido de la Actividad': l.activities?.[0]?.content || l.activities?.[0]?.text || l.notes || 'Reunión de seguimiento con prospecto',
+            'Fecha de Actividad': l.activities?.[0]?.createdAt || l.activities?.[0]?.date || new Date().toISOString(),
             'Resumen de IA': l.summary || l.aiInsights?.summary || 'Interesado en automatizar procesos con IA',
             'Notas / Mensaje': l.notes || 'Contacto consultado en tiempo real desde LeadsHUB',
             'Fecha de Registro': l.createdAt || new Date().toISOString(),
@@ -501,6 +524,8 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
             'Motivo de Transferencia': 'Solicita cotización personalizada con asesor',
             'Asesor Asignado': l.assignedUser?.name || userName || 'Gabriel Marín',
             'Último Mensaje del Cliente': 'Hola, quiero contratar el plan hoy mismo',
+            'Estado de Conversación': 'Cerrada',
+            'Fecha de Cierre': new Date().toISOString(),
             'Servicio o Producto de Interés': 'Suite Empresarial Kônsul',
             'Presupuesto Mencionado': '$500 USD',
             'Nivel de Urgencia': 'Alto',
@@ -534,6 +559,12 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
         'Estado Anterior': 'Cotización',
         'Puntaje de Scoring': '95',
         'Etiquetas del Lead': 'VIP, Corporativo',
+        'Etiquetas Nuevas Añadidas': 'VIP, Cliente Potencial',
+        'Etiquetas Totales del Lead': 'VIP, Corporativo, Cliente Potencial',
+        'ID de Actividad': 'act_lh_55',
+        'Tipo de Actividad': 'Nota de Bitácora',
+        'Texto / Contenido de la Actividad': 'El prospecto confirmó interés en la demo para su equipo de ventas.',
+        'Fecha de Actividad': new Date().toISOString(),
         'Resumen de IA': 'Cliente interesado en automatizar facturación y flujos con agentes de IA',
         'Notas / Mensaje': 'Solicita integración con su sistema contable',
         'Fecha de Registro': new Date().toISOString(),
@@ -549,6 +580,8 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
         'Motivo de Transferencia': 'Solicita descuento comercial y cierre de contrato',
         'Asesor Asignado': 'Gabriel Marín',
         'Último Mensaje del Cliente': 'Me interesa avanzar hoy mismo',
+        'Estado de Conversación': 'Cerrada / Resuelta',
+        'Fecha de Cierre': new Date().toISOString(),
         'Servicio o Producto de Interés': 'Suite Empresarial + Facturación',
         'Presupuesto Mencionado': '$500/mes',
         'Nivel de Urgencia': 'Alto',
