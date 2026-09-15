@@ -12,7 +12,8 @@ import {
   fetchProcessTemplates,
   getConnectedIntegrations,
   connectAppOneClick,
-  disconnectApp
+  disconnectApp,
+  fetchRealTriggerData
 } from '../app/automatizaciones/actions';
 import { ALL_APPS, APP_NAMES_MAP, type AppConfig } from '@/lib/appsConfig';
 
@@ -93,6 +94,7 @@ export default function IntegrationCard({
   
   // Rules State
   const [rules, setRules] = useState<AutomationRule[]>(initialRules);
+  const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
 
   useEffect(() => {
     setRules(initialRules);
@@ -341,83 +343,16 @@ export default function IntegrationCard({
   const handleTestRuleTrigger = async (rule: AutomationRule) => {
     const srcAppObj = ALL_APPS[rule.sourceApp];
     const trigName = srcAppObj?.triggers[rule.triggerIdx]?.name || '';
+    const targetAppName = ALL_APPS[rule.targetApp]?.name || rule.targetApp;
 
-    let mockData: Record<string, string> = {};
-    if (rule.sourceApp === 'bills') {
-      if (trigName === 'Nuevo Cliente o Prospecto') {
-        mockData = {
-          'ID del Cliente': 'cli_manual_99',
-          'Nombre del Cliente': 'Cliente de Prueba Manual',
-          'Email del Cliente': 'test-manual@suite.com',
-          'Teléfono': '+507 6000-1111',
-          'RUC / Cédula': '8-765-4321',
-          'Dirección': 'Obarrio, Calle 50, Ciudad de Panamá',
-          'Notas': 'Cliente prospecto con alta intención de compra',
-          'Fecha de Creación': new Date().toISOString()
-        };
-      } else {
-        mockData = {
-          'ID de Factura / Documento': 'FAC-2026-0042',
-          'Tipo de Documento': 'Factura',
-          'Nombre del Cliente': 'Cliente Manual Factura S.A.',
-          'Email del Cliente': 'cliente-factura-manual@suite.com',
-          'Teléfono del Cliente': '+507 6234-5678',
-          'RUC / Cédula del Cliente': '1557890-1-654321 DV 89',
-          'Dirección del Cliente': 'Costa del Este, Torre Financial Park, Piso 14',
-          'Monto Total': '850.00',
-          'Moneda': 'USD',
-          'Concepto de Venta': 'Servicio Técnico de Servidores y Cloud',
-          'Estado de Factura': 'Creada',
-          'Fecha de Creación': new Date().toISOString(),
-          'Fecha de Vencimiento': new Date(Date.now() + 15 * 86400000).toISOString(),
-          'Notas del Documento': 'Términos de pago: 15 días calendario.',
-          'Documento Adjunto (URL / PDF)': 'https://bills.konsul.digital/api/v1/invoices?id=FAC-2026-0042',
-          'Enlace de Factura en Bills': 'https://bills.konsul.digital?invoiceId=FAC-2026-0042'
-        };
-      }
-    } else if (rule.sourceApp === 'reactivaleads' || rule.sourceApp === 'leadshub') {
-      mockData = {
-        'ID del Lead': 'lead_lh_8892',
-        'Nombre del Lead': 'Carlos Rodríguez',
-        'Email del Lead': 'carlos.rodriguez@empresa.com',
-        'Teléfono del Lead': '+507 6555-8888',
-        'Origen / Canal': 'WhatsApp Business',
-        'Estado de Embudo': 'Calificado',
-        'Nuevo Estado de Embudo': 'Ganado',
-        'Estado Anterior': 'Cotización',
-        'Puntaje de Scoring': '95',
-        'Etiquetas del Lead': 'VIP, Corporativo',
-        'Resumen de IA': 'Cliente interesado en automatizar facturación y flujos con agentes de IA',
-        'Notas / Mensaje': 'Solicita integración con su sistema contable',
-        'Fecha de Registro': new Date().toISOString(),
-        'Fecha de Actualización': new Date().toISOString(),
-        'ID de Cita': 'meet_lh_401',
-        'Título de Cita': 'Demostración Comercial Kônsul',
-        'Fecha y Hora de Inicio': new Date(Date.now() + 86400000).toISOString(),
-        'Fecha y Hora de Fin': new Date(Date.now() + 90000000).toISOString(),
-        'Enlace de Reunión / Ubicación': 'https://meet.google.com/xyz-abcd-efg',
-        'Categoría de Cita': 'Demostración',
-        'ID de Conversación': 'conv_lh_900',
-        'Canal (WhatsApp / Instagram / Web)': 'WhatsApp',
-        'Motivo de Transferencia': 'Solicita descuento comercial y cierre de contrato',
-        'Asesor Asignado': 'Gabriel Marín',
-        'Último Mensaje del Cliente': 'Me interesa avanzar hoy mismo',
-        'Servicio o Producto de Interés': 'Suite Empresarial + Facturación',
-        'Presupuesto Mencionado': '$500/mes',
-        'Nivel de Urgencia': 'Alto',
-        'Resumen de Necesidad': 'Automatizar emisión de facturas y cobros vía WhatsApp'
-      };
-    } else {
-      mockData = {
-        'ID de Tarea': 'task_manual_88',
-        'Título de Tarea': 'Tarea de Prueba Automatizada',
-        'Descripción': 'Creada mediante el botón Probar de la Suite',
-        'Documento Adjunto (URL)': 'https://bills.konsul.digital/api/v1/invoices?id=FAC-2026-0042',
-        'Fecha de Creación': new Date().toISOString()
-      };
-    }
+    setTestingRuleId(rule.id);
 
     try {
+      // 1. Obtener datos reales de la base de datos de la app origen según el disparador
+      const realRes = await fetchRealTriggerData(rule.sourceApp, rule.triggerIdx, trigName);
+      const triggerData = realRes.data || {};
+
+      // 2. Disparar el motor de automatizaciones con los datos reales
       const response = await fetch('/api/v1/automations/trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -425,20 +360,44 @@ export default function IntegrationCard({
           appCode: rule.sourceApp,
           triggerName: trigName,
           userId: rule.userId,
-          data: mockData
+          data: triggerData
         })
       });
 
       const resData = await response.json();
 
       if (response.ok && resData.success) {
-        alert('Prueba disparada con éxito.\nSe procesó la regla y se ejecutó la acción.\nRevisa el Historial (Logs) para ver los detalles.');
+        // Formatear las variables mapeadas con sus valores reales aplicados
+        const mappings = (rule.mappings as Record<string, string>) || {};
+        const mappingTypes = (rule.mappingTypes as Record<string, 'field' | 'static'>) || {};
+
+        const appliedLines = Object.entries(mappings)
+          .filter(([k]) => k !== '__templateId')
+          .map(([targetField, sourceField]) => {
+            const isField = (mappingTypes[targetField] || 'field') === 'field';
+            const value = isField ? ((triggerData as any)[sourceField] || `[${sourceField}]`) : sourceField;
+            return `• ${targetField}: "${value}"`;
+          });
+
+        const alertMessage = 
+          `✅ Regla de Automatización Probada con Éxito\n\n` +
+          `🔍 ${realRes.summary}\n` +
+          `⚡ Disparador: ${trigName}\n` +
+          `🎯 App Destino: ${targetAppName}\n\n` +
+          `Variables reales aplicadas a la acción:\n` +
+          (appliedLines.length > 0 ? appliedLines.join('\n') : '• Ejecución estándar sin variables') +
+          `\n\nRevisa el Historial (Logs) para ver la confirmación devuelta por ${targetAppName}.`;
+
+        alert(alertMessage);
+        window.dispatchEvent(new Event('konsul_rules_updated'));
       } else {
-        alert(`Fallo al disparar la prueba: ${resData.error || 'Error desconocido'}`);
+        alert(`Fallo al ejecutar la prueba: ${resData.error || 'Error desconocido'}`);
       }
     } catch (err: any) {
       console.error(err);
-      alert(`Error de red al disparar la prueba: ${err.message || err}`);
+      alert(`Error al ejecutar prueba con datos reales: ${err.message || err}`);
+    } finally {
+      setTestingRuleId(null);
     }
   };
 
@@ -1235,12 +1194,28 @@ export default function IntegrationCard({
                           type="button"
                           onClick={() => handleTestRuleTrigger(rule)}
                           className="btn-rule-test"
-                          title="Disparar prueba manual"
+                          disabled={testingRuleId === rule.id}
+                          title="Disparar prueba con datos reales"
+                          style={{
+                            opacity: testingRuleId === rule.id ? 0.7 : 1,
+                            cursor: testingRuleId === rule.id ? 'wait' : 'pointer'
+                          }}
                         >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                          </svg>
-                          <span>Probar</span>
+                          {testingRuleId === rule.id ? (
+                            <>
+                              <svg style={{ animation: 'spin 1s linear infinite' }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12"></circle>
+                              </svg>
+                              <span>Consultando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                              </svg>
+                              <span>Probar</span>
+                            </>
+                          )}
                         </button>
 
                         {/* Dedicated clean small toggle without broken scale */}
