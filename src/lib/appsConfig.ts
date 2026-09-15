@@ -548,30 +548,167 @@ export const ALL_APPS: Record<string, AppConfig> = {
     ]
   },
   reactivaleads: {
-    name: 'Kônsul Reactivaleads',
+    name: 'Kônsul LeadsHUB',
     code: 'reactivaleads',
     triggers: [
       { 
-        name: 'Nuevo Lead Registrado', 
-        description: 'Se dispara al capturar un lead de formulario o chat.', 
-        outputs: ['Nombre del Lead', 'Email del Lead', 'Teléfono del Lead'] 
+        name: 'Nuevo Lead Registrado (Chat / Form)', 
+        description: 'Se dispara al crearse un nuevo contacto o lead en LeadsHUB (chat, WhatsApp o formulario). [contact:created]', 
+        outputs: [
+          'ID del Lead',
+          'Nombre del Lead', 
+          'Email del Lead', 
+          'Teléfono del Lead',
+          'Origen / Canal',
+          'Estado de Embudo',
+          'Puntaje de Scoring',
+          'Etiquetas del Lead',
+          'Resumen de IA',
+          'Notas / Mensaje',
+          'Fecha de Registro'
+        ] 
       },
       { 
-        name: 'Lead Calificado', 
-        description: 'Se dispara al alcanzar un score crediticio o comercial mínimo.', 
-        outputs: ['Nombre del Lead', 'Email del Lead', 'Puntaje de Scoring'] 
+        name: 'Estado de Prospecto Cambiado (Embudo Kanban)', 
+        description: 'Se dispara cuando un prospecto cambia de columna en el embudo Kanban. [contact:status_changed]', 
+        outputs: [
+          'ID del Lead',
+          'Nombre del Lead', 
+          'Email del Lead', 
+          'Teléfono del Lead',
+          'Estado Anterior',
+          'Nuevo Estado de Embudo',
+          'Puntaje de Scoring',
+          'Asesor Asignado',
+          'Resumen de IA',
+          'Fecha de Actualización'
+        ] 
+      },
+      { 
+        name: 'Etiqueta Añadida a Lead', 
+        description: 'Se dispara cuando se añade una o más etiquetas nuevas al contacto en el CRM. [contact:tag_added]', 
+        outputs: [
+          'ID del Lead',
+          'Nombre del Lead', 
+          'Email del Lead', 
+          'Teléfono del Lead',
+          'Etiquetas Nuevas Añadidas',
+          'Etiquetas Totales del Lead',
+          'Estado de Embudo',
+          'Puntaje de Scoring',
+          'Fecha de Actualización'
+        ] 
+      },
+      { 
+        name: 'Nueva Actividad o Nota Registrada', 
+        description: 'Se dispara al registrarse una nueva nota, tarea o actividad en la bitácora del contacto. [contact:activity_added]', 
+        outputs: [
+          'ID de Actividad',
+          'Tipo de Actividad',
+          'Texto / Contenido de la Actividad',
+          'Fecha de Actividad',
+          'ID del Lead',
+          'Nombre del Lead', 
+          'Email del Lead', 
+          'Teléfono del Lead',
+          'Estado de Embudo'
+        ] 
+      },
+      { 
+        name: 'Cita o Reunión Agendada', 
+        description: 'Se dispara cuando el agente de IA o un asesor agenda una cita en el calendario. [calendar:event_created]', 
+        outputs: [
+          'ID de Cita',
+          'Título de Cita',
+          'Fecha y Hora de Inicio',
+          'Fecha y Hora de Fin',
+          'Enlace de Reunión / Ubicación',
+          'Nombre del Lead',
+          'Email del Lead',
+          'Teléfono del Lead',
+          'Categoría de Cita'
+        ] 
+      },
+      { 
+        name: 'Conversación Transferida a Humano (Handoff)', 
+        description: 'Se dispara cuando el bot transfiere la conversación a un asesor humano o el cliente solicita ayuda. [conversation:handoff_requested]', 
+        outputs: [
+          'ID de Conversación',
+          'ID del Lead',
+          'Nombre del Lead',
+          'Email del Lead',
+          'Teléfono del Lead',
+          'Departamento / Motivo',
+          'Asesor Asignado',
+          'Canal (WhatsApp / Instagram / Web)',
+          'Último Mensaje del Cliente'
+        ] 
+      },
+      { 
+        name: 'Conversación Cerrada o Resuelta', 
+        description: 'Se dispara cuando una conversación en WhatsApp o canal finaliza o se marca como resuelta. [conversation:closed]', 
+        outputs: [
+          'ID de Conversación',
+          'ID del Lead',
+          'Nombre del Lead',
+          'Email del Lead',
+          'Teléfono del Lead',
+          'Estado de Conversación',
+          'Estado de Embudo',
+          'Resumen de IA',
+          'Fecha de Cierre'
+        ] 
+      },
+      { 
+        name: 'Intención Comercial Detectada por IA', 
+        description: 'Se dispara cuando el agente clasifica que el lead tiene alta intención de compra o solicita cotización.', 
+        outputs: [
+          'ID del Lead',
+          'Nombre del Lead', 
+          'Email del Lead', 
+          'Teléfono del Lead',
+          'Servicio o Producto de Interés',
+          'Presupuesto Mencionado',
+          'Nivel de Urgencia',
+          'Resumen de Necesidad'
+        ] 
       }
     ],
     actions: [
       { 
-        name: 'Crear o Importar Lead', 
-        description: 'Inserta un nuevo prospecto en la base de datos central.', 
-        fields: ['Nombre del Lead', 'Email del Lead', 'Teléfono del Lead'] 
+        name: 'Crear o Actualizar Lead en CRM', 
+        description: 'Inserta o sincroniza los datos de un prospecto en el CRM central de LeadsHUB.', 
+        fields: ['Nombre del Lead', 'Email del Lead', 'Teléfono del Lead', 'Estado de Embudo', 'Etiquetas (separadas por coma)', 'Notas / Historial', 'Puntaje de Scoring'] 
       },
       { 
-        name: 'Asignar Agente', 
-        description: 'Asigna un prospecto a un asesor.', 
-        fields: ['Email del Asesor/Agente'] 
+        name: 'Enviar Mensaje Proactivo (WhatsApp / Canal)', 
+        description: 'Envía un mensaje personalizado al cliente por WhatsApp o su canal activo mediante el agente de IA.', 
+        fields: ['Teléfono del Lead', 'Mensaje a Enviar', 'Documento Adjunto (URL / PDF)', 'Nombre del Lead'] 
+      },
+      { 
+        name: 'Mover Lead de Estado de Embudo', 
+        description: 'Actualiza la etapa o columna del pipeline Kanban para el prospecto.', 
+        fields: ['Teléfono o Email del Lead', 'Nuevo Estado de Embudo', 'Nota de Cambio de Estado'] 
+      },
+      { 
+        name: 'Añadir Etiquetas a Lead', 
+        description: 'Asigna etiquetas de segmentación al contacto en el CRM (ej. Facturado, VIP).', 
+        fields: ['Teléfono o Email del Lead', 'Etiquetas a Añadir'] 
+      },
+      { 
+        name: 'Agendar Cita en Calendario', 
+        description: 'Crea una cita o reunión vinculada al contacto.', 
+        fields: ['Email o Teléfono del Lead', 'Título de Cita', 'Fecha y Hora de Inicio', 'Fecha y Hora de Fin', 'Enlace / Ubicación'] 
+      },
+      { 
+        name: 'Registrar Nota o Actividad en Bitácora', 
+        description: 'Añade una nota de historial o actividad en la ficha del lead.', 
+        fields: ['Teléfono o Email del Lead', 'Texto de la Nota / Actividad', 'Tipo de Actividad'] 
+      },
+      { 
+        name: 'Asignar Asesor a Conversación', 
+        description: 'Transfiere la conversación a un miembro del equipo comercial o de soporte.', 
+        fields: ['ID de Conversación o Teléfono', 'Email o Nombre del Asesor'] 
       }
     ]
   }

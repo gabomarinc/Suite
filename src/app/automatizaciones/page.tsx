@@ -56,7 +56,7 @@ export default async function AutomatizacionesPage() {
       keyPrefix: 'kp_live_ o kp_svc_'
     },
     {
-      code: 'reactivaleads',
+      code: 'leadshub',
       name: 'Kônsul LeadsHUB',
       description: 'Chatbot IA & CRM',
       color: '#4f46e5',
@@ -91,7 +91,7 @@ export default async function AutomatizacionesPage() {
   ];
 
   const connectedApps = apps.filter(app => {
-    const intData = activeIntegrationsMap.get(app.code);
+    const intData = activeIntegrationsMap.get(app.code) || (app.code === 'leadshub' ? activeIntegrationsMap.get('reactivaleads') : undefined);
     return intData?.isActive && !!intData?.serviceKey;
   });
   const connectedCount = connectedApps.length;
@@ -221,7 +221,7 @@ export default async function AutomatizacionesPage() {
       {/* Integration Apps List Rows (Image 3 style) */}
       <div className="integrations-list-container">
         {apps.map(app => {
-          const intData = activeIntegrationsMap.get(app.code);
+          const intData = activeIntegrationsMap.get(app.code) || (app.code === 'leadshub' ? activeIntegrationsMap.get('reactivaleads') : undefined);
           const isActive = intData?.isActive || false;
           const serviceKey = intData?.serviceKey || '';
 

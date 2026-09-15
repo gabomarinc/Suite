@@ -428,11 +428,16 @@ export default function IntegrationCard({
     }
   };
 
-  const currentAppRules = rules.filter(r => r.sourceApp === app.code || r.targetApp === app.code);
+  const currentAppRules = rules.filter(r => 
+    r.sourceApp === app.code || 
+    r.targetApp === app.code ||
+    (app.code === 'leadshub' && (r.sourceApp === 'reactivaleads' || r.targetApp === 'reactivaleads')) ||
+    (app.code === 'reactivaleads' && (r.sourceApp === 'leadshub' || r.targetApp === 'leadshub'))
+  );
   const isConnected = !!serviceKey && isActive;
 
   // Destination apps: Bills, Process, and Mailing are ALWAYS available as targets for all apps
-  const DESTINATION_ORDER = ['bills', 'process', 'mailing', 'reactivaleads', 'kredit'];
+  const DESTINATION_ORDER = ['bills', 'process', 'mailing', 'leadshub', 'kredit'];
   const availableTargetApps = DESTINATION_ORDER
     .map(code => ALL_APPS[code])
     .filter(Boolean);
