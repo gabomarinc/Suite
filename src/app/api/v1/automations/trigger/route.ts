@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     // If incoming request is from LeadsHUB via contract:
     // Headers: x-source-app: leadshub, x-api-key, x-workspace-id
     // Body: { event: "contact:created | contact:status_changed | contact:tag_added | contact:activity_added | calendar:event_created | conversation:handoff_requested | conversation:closed", timestamp: "...", data: { ... } }
-    if (sourceAppHeader === 'leadshub' || sourceAppHeader === 'reactivaleads' || rawBody.event) {
+    if (sourceAppHeader === 'leadshub' || rawBody.event) {
       appCode = 'leadshub';
       const event = rawBody.event || '';
       const rawData = rawBody.data || {};
@@ -180,8 +180,18 @@ export async function POST(req: Request) {
         if (!userId && workspaceIdHeader) {
           const integ = await prisma.integration.findFirst({
             where: {
-              appCode: { in: ['leadshub', 'reactivaleads'] },
+              appCode: 'leadshub',
               serviceKey: workspaceIdHeader
+            }
+          });
+          if (integ) userId = integ.userId;
+        }
+
+        if (!userId && apiKeyHeader) {
+          const integ = await prisma.integration.findFirst({
+            where: {
+              appCode: 'leadshub',
+              serviceKey: apiKeyHeader
             }
           });
           if (integ) userId = integ.userId;
@@ -201,8 +211,7 @@ export async function POST(req: Request) {
       return jsonResponse({ success: false, error: "Missing parameters (appCode, triggerName, userId)" }, { status: 400 });
     }
 
-    // Resolve triggerIdx from triggerName with support for both leadshub & reactivaleads aliases
-    const appConfig = ALL_APPS[appCode] || ALL_APPS.reactivaleads;
+    const appConfig = ALL_APPS[appCode];
     if (!appConfig) {
       return jsonResponse({ success: false, error: `App config not found for ${appCode}` }, { status: 404 });
     }
@@ -228,10 +237,8 @@ export async function POST(req: Request) {
 
     const resolvedUserId = dbUser ? dbUser.id : cleanUserId;
 
-    // Find active automation rules (support app aliases leadshub <-> reactivaleads)
+    // Find active automation rules
     const sourceAppList = [appCode];
-    if (appCode === 'leadshub') sourceAppList.push('reactivaleads');
-    if (appCode === 'reactivaleads') sourceAppList.push('leadshub');
 
     const rules = await prisma.automationRule.findMany({
       where: {
@@ -309,24 +316,12 @@ export async function POST(req: Request) {
         }
       });
 
-      if (!targetIntegration && (targetApp === 'leadshub' || targetApp === 'reactivaleads')) {
-        const altApp = targetApp === 'leadshub' ? 'reactivaleads' : 'leadshub';
-        targetIntegration = await prisma.integration.findUnique({
-          where: {
-            userId_appCode: {
-              userId: rule.userId,
-              appCode: altApp
-            }
-          }
-        });
-      }
-
       // Auto-fallback for LeadsHUB shared secret authentication (Section 03 of contract)
       const sharedSecret = process.env.KONSUL_ECOSYSTEM_SECRET_KEY 
         || process.env.INTERNAL_API_KEY 
         || 'konsul_ecosystem_secret_key';
 
-      if (!targetIntegration && (targetApp === 'leadshub' || targetApp === 'reactivaleads')) {
+      if (!targetIntegration && targetApp === 'leadshub') {
         targetIntegration = {
           id: 'auto_lh_' + rule.userId,
           userId: rule.userId,
@@ -828,66 +823,6 @@ export async function POST(req: Request) {
               status: 'FAILED',
               errorDetails: fetchErr.message || 'Error de conexión con LeadsHUB',
               payloadSent: requestBody,
-              responseRec: Prisma.DbNull
-            }
-          });
-          executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });
-        }
-      } else if (targetApp === 'reactivaleads') {
-        const appCfg = ALL_APPS.reactivaleads;
-        const actionConfig = appCfg?.actions[rule.actionIdx];
-        const actionName = actionConfig?.name || 'Acción en Reactivaleads';
-        const reactivaleadsUrl = process.env.REACTIVALEADS_URL 
-          || process.env.NEXT_PUBLIC_REACTIVALEADS_URL 
-          || 'https://reactivaleads.konsul.digital';
-
-        try {
-          const response = await fetch(`${reactivaleadsUrl}/api/v1/leads`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': targetIntegration.serviceKey || sharedSecret,
-              'x-user-id': rule.userId,
-              'x-user-email': userEmail,
-              'x-user-name': userName
-            },
-            body: JSON.stringify({
-              action: actionName,
-              variables: resolvedVariables
-            })
-          });
-
-          let resData: any = {};
-          try { resData = await response.json(); } catch (e) { resData = { message: 'OK' }; }
-          const isSuccess = response.ok;
-
-          const log = await prisma.automationLog.create({
-            data: {
-              userId: rule.userId,
-              ruleId: rule.id,
-              sourceApp: appCode,
-              targetApp,
-              triggerName,
-              actionName,
-              status: isSuccess ? 'SUCCESS' : 'FAILED',
-              errorDetails: isSuccess ? null : (resData.error || 'Error al procesar acción en Reactivaleads'),
-              payloadSent: resolvedVariables,
-              responseRec: resData
-            }
-          });
-          executionResults.push({ ruleId: rule.id, status: isSuccess ? 'SUCCESS' : 'FAILED', logId: log.id });
-        } catch (fetchErr: any) {
-          const log = await prisma.automationLog.create({
-            data: {
-              userId: rule.userId,
-              ruleId: rule.id,
-              sourceApp: appCode,
-              targetApp,
-              triggerName,
-              actionName,
-              status: 'FAILED',
-              errorDetails: fetchErr.message || 'Error de conexión con Reactivaleads',
-              payloadSent: resolvedVariables,
               responseRec: Prisma.DbNull
             }
           });

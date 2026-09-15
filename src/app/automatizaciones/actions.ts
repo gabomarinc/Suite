@@ -151,7 +151,6 @@ export async function testIntegration(appCode: string, serviceKey: string) {
   const prefixes: Record<string, string[]> = {
     bills: ['kb_live_', 'kb_svc_', 'kb_test_', 'konsul_sso_'],
     process: ['kp_live_', 'kp_svc_', 'kp_test_', 'konsul_sso_'],
-    reactivaleads: ['lh_live_', 'lh_svc_', 'lh_test_', 'konsul_sso_'],
     leadshub: ['lh_live_', 'lh_svc_', 'lh_test_', 'konsul_sso_'],
     kredit: ['kk_live_', 'kk_svc_', 'kk_test_', 'konsul_sso_'],
     mailing: ['km_live_', 'km_svc_', 'km_test_', 'konsul_sso_']
@@ -216,7 +215,7 @@ export async function testIntegration(appCode: string, serviceKey: string) {
           }
         }
       } catch {}
-    } else if (appCode === 'leadshub' || appCode === 'reactivaleads') {
+    } else if (appCode === 'leadshub') {
       const leadshubUrl = process.env.LEADSHUB_URL || process.env.NEXT_PUBLIC_LEADSHUB_URL || 'https://agentes.konsul.digital';
       logs.push(`LeadsHUB (${leadshubUrl}) API v1 conectada y lista para sincronizar leads CRM, agentes IA y mensajería WhatsApp.`);
       
@@ -282,14 +281,10 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
 
   const userName = [user.given_name, user.family_name].filter(Boolean).join(' ') || (user as any).name || 'Usuario';
 
-  const targetCodes = [sourceApp];
-  if (sourceApp === 'leadshub') targetCodes.push('reactivaleads');
-  if (sourceApp === 'reactivaleads') targetCodes.push('leadshub');
-
   const integration = await prisma.integration.findFirst({
     where: {
       userId: user.id,
-      appCode: { in: targetCodes },
+      appCode: sourceApp,
       isActive: true
     }
   });
@@ -451,8 +446,8 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
     };
   }
 
-  // 2. LEADSHUB / REACTIVALEADS
-  if (sourceApp === 'leadshub' || sourceApp === 'reactivaleads') {
+  // 2. LEADSHUB
+  if (sourceApp === 'leadshub') {
     const leadshubUrl = process.env.LEADSHUB_URL 
       || process.env.NEXT_PUBLIC_LEADSHUB_URL 
       || 'https://agentes.konsul.digital';
