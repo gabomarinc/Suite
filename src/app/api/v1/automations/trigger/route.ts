@@ -32,22 +32,31 @@ export async function POST(req: Request) {
     const workspaceIdHeader = headers.get('x-workspace-id') || '';
     const userEmailHeader = headers.get('x-user-email') || '';
 
-    let appCode = rawBody.appCode;
+    let appCode = (rawBody.appCode || sourceAppHeader || '').toLowerCase();
     let triggerName = rawBody.triggerName;
-    let userId = rawBody.userId;
+    let userId = rawBody.userId || headers.get('x-user-id') || '';
     let data = rawBody.data || {};
 
-    // --- SUPPORT FOR LEADSHUB WEBHOOK CONTRACT (7 Official Triggers) ---
-    // If incoming request is from LeadsHUB via contract:
-    // Headers: x-source-app: leadshub, x-api-key, x-workspace-id
-    // Body: { event: "contact:created | contact:status_changed | contact:tag_added | contact:activity_added | calendar:event_created | conversation:handoff_requested | conversation:closed", timestamp: "...", data: { ... } }
-    if (sourceAppHeader === 'leadshub' || rawBody.event) {
+    const incomingEvent = (rawBody.event || triggerName || '').toString().toLowerCase();
+    const isLeadsHub = appCode === 'leadshub' 
+      || sourceAppHeader === 'leadshub' 
+      || !!rawBody.event 
+      || incomingEvent.startsWith('contact:') 
+      || incomingEvent.startsWith('calendar:') 
+      || incomingEvent.startsWith('conversation:') 
+      || incomingEvent.startsWith('lead.');
+
+    // --- SUPPORT FOR LEADSHUB WEBHOOK CONTRACT (7 Official Triggers + Aliases) ---
+    // Accepts either:
+    // 1. LeadsHUB Webhook format: { event: "contact:status_changed", data: { ... } }
+    // 2. Standard Suite API format: { appCode: "leadshub", triggerName: "contact:status_changed" | "Estado de Prospecto Cambiado...", data: { ... } }
+    if (isLeadsHub) {
       appCode = 'leadshub';
-      const event = rawBody.event || '';
+      const event = (rawBody.event || triggerName || '').toString().trim();
       const rawData = rawBody.data || {};
       const contact = (typeof rawData.contact === 'object' && rawData.contact !== null) ? rawData.contact : rawData;
 
-      if (event === 'contact:created' || event === 'lead.created') {
+      if (event === 'contact:created' || event === 'lead.created' || event.toLowerCase().includes('nuevo lead')) {
         triggerName = 'Nuevo Lead Registrado (Chat / Form)';
         data = {
           'ID del Lead': contact.id || contact.contactId || '',
@@ -63,7 +72,7 @@ export async function POST(req: Request) {
           'Fecha de Registro': rawBody.timestamp || contact.createdAt || new Date().toISOString(),
           ...rawData
         };
-      } else if (event === 'contact:status_changed' || event === 'lead.status_changed') {
+      } else if (event === 'contact:status_changed' || event === 'lead.status_changed' || event.toLowerCase().includes('status_changed') || event.toLowerCase().includes('calificado') || event.toLowerCase().includes('embudo kanban')) {
         triggerName = 'Estado de Prospecto Cambiado (Embudo Kanban)';
         data = {
           'ID del Lead': contact.id || contact.contactId || '',
@@ -78,7 +87,7 @@ export async function POST(req: Request) {
           'Fecha de Actualización': rawBody.timestamp || new Date().toISOString(),
           ...rawData
         };
-      } else if (event === 'contact:tag_added') {
+      } else if (event === 'contact:tag_added' || event.toLowerCase().includes('tag_added') || event.toLowerCase().includes('etiqueta añadida')) {
         triggerName = 'Etiqueta Añadida a Lead';
         const addedTagsStr = Array.isArray(rawData.addedTags) ? rawData.addedTags.join(', ') : (rawData.addedTags || '');
         const allTagsStr = Array.isArray(contact.tags) ? contact.tags.join(', ') : (contact.tags || addedTagsStr);
@@ -94,7 +103,7 @@ export async function POST(req: Request) {
           'Fecha de Actualización': rawBody.timestamp || new Date().toISOString(),
           ...rawData
         };
-      } else if (event === 'contact:activity_added') {
+      } else if (event === 'contact:activity_added' || event.toLowerCase().includes('activity_added') || event.toLowerCase().includes('actividad o nota')) {
         triggerName = 'Nueva Actividad o Nota Registrada';
         const act = rawData.activity || {};
         data = {
@@ -109,7 +118,7 @@ export async function POST(req: Request) {
           'Estado de Embudo': contact.prospectStatus || contact.status || '',
           ...rawData
         };
-      } else if (event === 'calendar:event_created' || event === 'meeting.created') {
+      } else if (event === 'calendar:event_created' || event === 'meeting.created' || event.toLowerCase().includes('event_created') || event.toLowerCase().includes('cita o reunión')) {
         triggerName = 'Cita o Reunión Agendada';
         data = {
           'ID de Cita': rawData.eventId || rawData.id || '',
@@ -123,7 +132,7 @@ export async function POST(req: Request) {
           'Categoría de Cita': rawData.category || 'Demostración',
           ...rawData
         };
-      } else if (event === 'conversation:handoff_requested' || event === 'chat.handoff') {
+      } else if (event === 'conversation:handoff_requested' || event === 'chat.handoff' || event.toLowerCase().includes('handoff') || event.toLowerCase().includes('transferida a humano')) {
         triggerName = 'Conversación Transferida a Humano (Handoff)';
         data = {
           'ID de Conversación': rawData.conversationId || rawData.id || '',
@@ -137,7 +146,7 @@ export async function POST(req: Request) {
           'Último Mensaje del Cliente': rawData.lastMessage || rawData.message || '',
           ...rawData
         };
-      } else if (event === 'conversation:closed') {
+      } else if (event === 'conversation:closed' || event.toLowerCase().includes('conversation:closed') || event.toLowerCase().includes('cerrada o resuelta')) {
         triggerName = 'Conversación Cerrada o Resuelta';
         data = {
           'ID de Conversación': rawData.conversationId || rawData.id || '',
@@ -151,7 +160,7 @@ export async function POST(req: Request) {
           'Fecha de Cierre': rawBody.timestamp || new Date().toISOString(),
           ...rawData
         };
-      } else if (event === 'lead.intent_detected' || event === 'intent:detected') {
+      } else if (event === 'lead.intent_detected' || event === 'intent:detected' || event.toLowerCase().includes('intención comercial')) {
         triggerName = 'Intención Comercial Detectada por IA';
         data = {
           'ID del Lead': contact.id || rawData.contactId || '',
@@ -168,37 +177,40 @@ export async function POST(req: Request) {
         triggerName = event;
       }
 
-      // Resolve user by email or workspace if userId not supplied directly
+      // Resolve user by email, workspace or apiKey if userId not supplied directly
       if (!userId) {
-        if (userEmailHeader) {
+        const emailToFind = userEmailHeader || rawBody.userEmail || rawBody.email;
+        if (emailToFind) {
           const u = await prisma.user.findFirst({
-            where: { email: { equals: userEmailHeader, mode: 'insensitive' } }
+            where: { email: { equals: emailToFind, mode: 'insensitive' } }
           });
           if (u) userId = u.id;
         }
 
-        if (!userId && workspaceIdHeader) {
+        const wsIdToFind = workspaceIdHeader || rawBody.workspaceId;
+        if (!userId && wsIdToFind) {
           const integ = await prisma.integration.findFirst({
             where: {
               appCode: 'leadshub',
-              serviceKey: workspaceIdHeader
+              serviceKey: wsIdToFind
             }
           });
           if (integ) userId = integ.userId;
         }
 
-        if (!userId && apiKeyHeader) {
+        const keyToFind = apiKeyHeader || rawBody.apiKey;
+        if (!userId && keyToFind) {
           const integ = await prisma.integration.findFirst({
             where: {
               appCode: 'leadshub',
-              serviceKey: apiKeyHeader
+              serviceKey: keyToFind
             }
           });
           if (integ) userId = integ.userId;
         }
 
-        if (!userId && (data.email || data['Email del Lead'])) {
-          const emailToFind = data.email || data['Email del Lead'];
+        if (!userId && (data.email || data['Email del Lead'] || contact.email)) {
+          const emailToFind = data.email || data['Email del Lead'] || contact.email;
           const u = await prisma.user.findFirst({
             where: { email: { equals: emailToFind, mode: 'insensitive' } }
           });
