@@ -268,6 +268,28 @@ export async function POST(req: Request) {
       const mappings = (rule.mappings as Record<string, string>) || {};
       const mappingTypes = (rule.mappingTypes as Record<string, 'field' | 'static'>) || {};
 
+      // 1. Check condition / filter status if rule specifies a specific status condition
+      const filterStatus = mappings['__filterStatus'];
+      if (filterStatus && filterStatus.trim() !== '' && filterStatus.toLowerCase() !== 'any') {
+        const incomingStatus = (
+          data['Nuevo Estado de Embudo'] || 
+          data['newStatus'] || 
+          data['Estado de Embudo'] || 
+          data['prospectStatus'] || 
+          data['Nuevo Estado'] || 
+          data['Columna Actual'] || 
+          data['status'] || 
+          ''
+        ).toString().toLowerCase().trim();
+
+        const targetStatus = filterStatus.toLowerCase().trim();
+        if (incomingStatus !== targetStatus && !incomingStatus.includes(targetStatus)) {
+          // Status condition not met (e.g. lead changed to 'Cotización' but rule only triggers for 'Calificado')
+          console.log(`[Rule ${rule.id}] Skipped: status filter '${filterStatus}' did not match incoming status '${incomingStatus}'`);
+          continue;
+        }
+      }
+
       // Enrich data with cross-app aliases and document attachments
       const docId = data['id'] || data['ID de Factura / Documento'] || data['invoiceId'] || data['docId'] || '';
       const enrichedData: Record<string, any> = { ...data };
@@ -417,7 +439,18 @@ export async function POST(req: Request) {
             },
             body: JSON.stringify({
               template_id: templateId,
-              variables: resolvedVariables
+              variables: {
+                ...resolvedVariables,
+                trigger_id: data['ID del Lead'] || data['ID de Factura / Documento'] || data['ID de Tarea'] || data['ID de Solicitud'] || data['id'] || '',
+                lead_id: data['ID del Lead'] || '',
+                contact_phone: data['Teléfono del Lead'] || data['Teléfono del Cliente'] || data['Teléfono'] || '',
+                contact_email: data['Email del Lead'] || data['Email del Cliente'] || data['Email'] || '',
+                contact_name: data['Nombre del Lead'] || data['Nombre del Cliente'] || ''
+              },
+              external_id: data['ID del Lead'] || data['ID de Factura / Documento'] || data['ID de Tarea'] || data['id'] || '',
+              customer_name: resolvedVariables['Cliente / Nombre de la Ejecución'] || data['Nombre del Lead'] || data['Nombre del Cliente'] || '',
+              customer_email: data['Email del Lead'] || data['Email del Cliente'] || '',
+              customer_phone: data['Teléfono del Lead'] || data['Teléfono del Cliente'] || ''
             })
           });
 

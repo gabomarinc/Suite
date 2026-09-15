@@ -6,6 +6,7 @@ import {
   toggleIntegration, 
   saveServiceKey,
   createAutomationRule,
+  updateAutomationRule,
   deleteAutomationRule,
   toggleAutomationRule,
   getAutomationRules,
@@ -96,9 +97,41 @@ export default function IntegrationCard({
   const [rules, setRules] = useState<AutomationRule[]>(initialRules);
   const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
 
+  // Editing Rule State
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+
+  // Status Filter State (for status change triggers)
+  const [filterStatus, setFilterStatus] = useState<string>('');
+
+  // Make/Zapier Live Sample Data State
+  const [sampleTriggerData, setSampleTriggerData] = useState<Record<string, any>>({});
+  const [isLoadingSample, setIsLoadingSample] = useState(false);
+
   useEffect(() => {
     setRules(initialRules);
   }, [initialRules]);
+
+  // Load real sample data for selected trigger
+  const loadTriggerSample = async (trigIdx: number) => {
+    setIsLoadingSample(true);
+    try {
+      const trigName = (ALL_APPS[app.code]?.triggers || [])[trigIdx]?.name || '';
+      const res = await fetchRealTriggerData(app.code, trigIdx, trigName);
+      if (res.success && res.data) {
+        setSampleTriggerData(res.data);
+      }
+    } catch (err) {
+      console.error('Error fetching real trigger sample:', err);
+    } finally {
+      setIsLoadingSample(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isExpanded) {
+      loadTriggerSample(selectedTriggerIdx);
+    }
+  }, [app.code, selectedTriggerIdx, isExpanded]);
 
   // Fetch all integrations on mount and listen to updates
   const fetchIntegrations = async () => {
@@ -236,7 +269,40 @@ export default function IntegrationCard({
     setMappingTypes({});
     setSelectedTriggerIdx(0);
     setSelectedActionIdx(0);
+    setFilterStatus('');
+    setEditingRuleId(null);
     setActiveTab('rules');
+  };
+
+  const handleEditRule = (rule: AutomationRule) => {
+    setEditingRuleId(rule.id);
+    setSelectedTriggerIdx(rule.triggerIdx || 0);
+    setTargetApp(rule.targetApp);
+    setSelectedActionIdx(rule.actionIdx || 0);
+    
+    if (rule.mappings && rule.mappings['__templateId']) {
+      setSelectedTemplateId(rule.mappings['__templateId']);
+    }
+    
+    if (rule.mappings && rule.mappings['__filterStatus']) {
+      setFilterStatus(rule.mappings['__filterStatus']);
+    } else {
+      setFilterStatus('');
+    }
+
+    const cleanMappings: Record<string, string> = {};
+    const cleanTypes: Record<string, 'field' | 'static'> = {};
+    Object.entries(rule.mappings || {}).forEach(([k, v]) => {
+      if (k !== '__templateId' && k !== '__filterStatus') {
+        cleanMappings[k] = v;
+        cleanTypes[k] = rule.mappingTypes?.[k] || 'field';
+      }
+    });
+
+    setMappingValues(cleanMappings);
+    setMappingTypes(cleanTypes);
+    setActiveTab('builder');
+    setCurrentStep(1);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -298,9 +364,20 @@ export default function IntegrationCard({
     e.preventDefault();
     const isProcessWithTemplates = targetApp === 'process' && processTemplates.length > 0;
     const targetAction = targetAppConfig.actions[selectedActionIdx];
-    const actionFields = isProcessWithTemplates
-      ? (processTemplates.find(t => t.id === selectedTemplateId)?.variables || []).filter((v: string) => v !== 'Miembro Involucrado (Email)')
-      : (targetAction?.fields || []);
+    
+    let actionFields: string[] = [];
+    if (isProcessWithTemplates) {
+      const tVars = (processTemplates.find(t => t.id === selectedTemplateId)?.variables || []).filter((v: string) => v !== 'Miembro Involucrado (Email)');
+      const extraProcessFields = [
+        'ID de Referencia (Lead / Trigger ID)',
+        'Teléfono del Cliente / Lead',
+        'Email del Cliente / Lead'
+      ];
+      actionFields = [...tVars, ...extraProcessFields.filter(f => !tVars.includes(f))];
+    } else {
+      actionFields = targetAction?.fields || [];
+    }
+
     const requiredFields = isProcessWithTemplates ? [] : (targetAction?.requiredFields || []);
 
     // Check only indispensable / required fields
@@ -328,25 +405,54 @@ export default function IntegrationCard({
       finalTypes['__templateId'] = 'static';
     }
 
+    if (filterStatus && filterStatus.trim()) {
+      finalMappings['__filterStatus'] = filterStatus.trim();
+      finalTypes['__filterStatus'] = 'static';
+    }
+
     try {
-      const savedRule = await createAutomationRule({
-        sourceApp: app.code,
-        triggerIdx: selectedTriggerIdx,
-        targetApp: targetApp,
-        actionIdx: selectedActionIdx,
-        mappings: finalMappings,
-        mappingTypes: finalTypes
-      });
+      if (editingRuleId) {
+        const updatedRule = await updateAutomationRule(editingRuleId, {
+          sourceApp: app.code,
+          triggerIdx: selectedTriggerIdx,
+          targetApp: targetApp,
+          actionIdx: selectedActionIdx,
+          mappings: finalMappings,
+          mappingTypes: finalTypes
+        });
 
-      const newRules = [savedRule as unknown as AutomationRule, ...rules];
-      setRules(newRules);
-      window.dispatchEvent(new Event('konsul_rules_updated'));
+        const newRules = rules.map(r => r.id === editingRuleId ? (updatedRule as unknown as AutomationRule) : r);
+        setRules(newRules);
+        window.dispatchEvent(new Event('konsul_rules_updated'));
 
-      setMappingValues({});
-      setMappingTypes({});
-      setCurrentStep(1);
-      setActiveTab('rules');
-      alert('Regla de automatización creada y activada con éxito.');
+        setEditingRuleId(null);
+        setFilterStatus('');
+        setMappingValues({});
+        setMappingTypes({});
+        setCurrentStep(1);
+        setActiveTab('rules');
+        alert('Regla de automatización actualizada con éxito.');
+      } else {
+        const savedRule = await createAutomationRule({
+          sourceApp: app.code,
+          triggerIdx: selectedTriggerIdx,
+          targetApp: targetApp,
+          actionIdx: selectedActionIdx,
+          mappings: finalMappings,
+          mappingTypes: finalTypes
+        });
+
+        const newRules = [savedRule as unknown as AutomationRule, ...rules];
+        setRules(newRules);
+        window.dispatchEvent(new Event('konsul_rules_updated'));
+
+        setFilterStatus('');
+        setMappingValues({});
+        setMappingTypes({});
+        setCurrentStep(1);
+        setActiveTab('rules');
+        alert('Regla de automatización creada y activada con éxito.');
+      }
     } catch (err) {
       console.error(err);
       alert('Error al guardar la regla en la base de datos.');
@@ -456,6 +562,12 @@ export default function IntegrationCard({
 
   // Selected trigger metadata
   const currentTrigger = currentAppConfig.triggers[selectedTriggerIdx] || { name: 'Disparador', outputs: [] };
+  const isStatusTrigger = 
+    currentTrigger.name.toLowerCase().includes('estado') || 
+    currentTrigger.name.toLowerCase().includes('status') ||
+    currentTrigger.name.toLowerCase().includes('cambiado') ||
+    currentTrigger.name.toLowerCase().includes('incobrable') ||
+    currentTrigger.name.toLowerCase().includes('abonada');
   
   // Selected action metadata
   const currentTargetAppName = ALL_APPS[targetApp]?.name || targetApp;
@@ -680,6 +792,64 @@ export default function IntegrationCard({
 
               {/* Wizard Steps Container */}
               <form onSubmit={handleAddRule} className="flow-wizard-container">
+
+                {/* Edit Mode Alert Banner */}
+                {editingRuleId && (
+                  <div style={{
+                    background: '#eff6ff',
+                    border: '1.5px solid #93c5fd',
+                    borderRadius: '12px',
+                    padding: '0.75rem 1rem',
+                    marginBottom: '1.25rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <div style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '8px',
+                        background: '#dbeafe',
+                        color: '#2563eb',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e40af' }}>
+                          Modo Edición: Modificando Regla de Automatización
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#3b82f6' }}>
+                          Modifica el disparador, filtros, app destino o mapeos y haz clic en Guardar Cambios.
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCancelBuilder}
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #bfdbfe',
+                        color: '#1d4ed8',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        padding: '0.35rem 0.75rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancelar Edición
+                    </button>
+                  </div>
+                )}
                 
                 {/* ─── PASO 1: DISPARADOR (ORIGEN) ─── */}
                 {currentStep > 1 ? (
@@ -696,7 +866,7 @@ export default function IntegrationCard({
                           Paso 1: Disparador — {currentTrigger.name}
                         </div>
                         <div className="flow-step-collapsed-meta">
-                          {app.name} • {currentTrigger.outputs.length} variables de base de datos disponibles
+                          {app.name} • {currentTrigger.outputs.length} variables disponibles {filterStatus ? `• Filtro: Estado "${filterStatus}"` : ''}
                         </div>
                       </div>
                     </div>
@@ -731,9 +901,12 @@ export default function IntegrationCard({
                       <select
                         value={selectedTriggerIdx}
                         onChange={(e) => {
-                          setSelectedTriggerIdx(parseInt(e.target.value));
+                          const newIdx = parseInt(e.target.value);
+                          setSelectedTriggerIdx(newIdx);
+                          setFilterStatus('');
                           setMappingValues({});
                           setMappingTypes({});
+                          loadTriggerSample(newIdx);
                         }}
                         style={{
                           width: '100%',
@@ -752,6 +925,122 @@ export default function IntegrationCard({
                         ))}
                       </select>
                     </div>
+
+                    {/* Conditional Status Filter (For status-change triggers) */}
+                    {isStatusTrigger && (
+                      <div style={{
+                        marginTop: '1rem',
+                        padding: '0.85rem 1rem',
+                        borderRadius: '12px',
+                        background: '#f8fafc',
+                        border: '1.5px solid #e2e8f0'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <label style={{ fontSize: '11px', fontWeight: 800, color: '#334155', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00a884" strokeWidth="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                            Condición de Disparo por Estado
+                          </label>
+                          {filterStatus ? (
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: '#00a884', background: '#f0fdfa', border: '1px solid #ccfbf1', padding: '2px 8px', borderRadius: '10px' }}>
+                              Filtro activo: Solo &ldquo;{filterStatus}&rdquo;
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '10px', fontWeight: 600, color: '#64748b' }}>
+                              Se activa con cualquier cambio de estado
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.65rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => setFilterStatus('')}
+                            style={{
+                              padding: '0.4rem 0.75rem',
+                              borderRadius: '8px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              border: !filterStatus ? '1.5px solid #00a884' : '1px solid #cbd5e1',
+                              background: !filterStatus ? '#f0fdfa' : '#ffffff',
+                              color: !filterStatus ? '#00a884' : '#64748b',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Cualquier cambio de estado
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!filterStatus) {
+                                const defaultSug = app.code === 'leadshub' ? 'Calificado' : app.code === 'bills' ? 'Pagada' : 'En Proceso';
+                                setFilterStatus(defaultSug);
+                              }
+                            }}
+                            style={{
+                              padding: '0.4rem 0.75rem',
+                              borderRadius: '8px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              border: !!filterStatus ? '1.5px solid #00a884' : '1px solid #cbd5e1',
+                              background: !!filterStatus ? '#f0fdfa' : '#ffffff',
+                              color: !!filterStatus ? '#00a884' : '#64748b',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Solo cuando cambie a un estado específico
+                          </button>
+                        </div>
+
+                        {filterStatus !== '' && (
+                          <div>
+                            <input
+                              type="text"
+                              placeholder="Escribe el nombre del estado (ej: Calificado, Ganado, Pagada, etc.)"
+                              value={filterStatus}
+                              onChange={(e) => setFilterStatus(e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '0.55rem 0.85rem',
+                                borderRadius: '8px',
+                                border: '1.5px solid #00a884',
+                                background: '#ffffff',
+                                fontSize: '0.85rem',
+                                fontWeight: 600,
+                                color: '#0f172a',
+                                outline: 'none'
+                              }}
+                            />
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.45rem' }}>
+                              <span style={{ fontSize: '10px', fontWeight: 600, color: '#94a3b8', alignSelf: 'center' }}>Sugerencias:</span>
+                              {(app.code === 'leadshub' 
+                                ? ['Calificado', 'Cotización', 'Negociación', 'Ganado', 'Perdido', 'Nuevo']
+                                : app.code === 'bills' 
+                                ? ['Pagada', 'Abonada', 'Enviada', 'Incobrable', 'Cancelada']
+                                : ['Por Hacer', 'En Proceso', 'En Revisión', 'Completado']
+                              ).map(sug => (
+                                <button
+                                  key={sug}
+                                  type="button"
+                                  onClick={() => setFilterStatus(sug)}
+                                  style={{
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    background: filterStatus.toLowerCase() === sug.toLowerCase() ? '#00a884' : '#ffffff',
+                                    color: filterStatus.toLowerCase() === sug.toLowerCase() ? '#ffffff' : '#334155',
+                                    border: filterStatus.toLowerCase() === sug.toLowerCase() ? '1px solid #00a884' : '1px solid #cbd5e1',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {sug}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Outputs Preview */}
                     <div style={{ marginTop: '1.25rem' }}>
@@ -992,13 +1281,94 @@ export default function IntegrationCard({
                       </div>
                     </div>
 
+                    {/* Live Sample Data Card (Make / Zapier style) */}
+                    <div style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      padding: '0.85rem 1rem',
+                      marginBottom: '1rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <div style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: isLoadingSample ? '#f59e0b' : '#10b981',
+                            boxShadow: isLoadingSample ? '0 0 6px #f59e0b' : '0 0 6px #10b981'
+                          }}></div>
+                          <span style={{ fontSize: '11px', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Datos Reales Detectados del Disparador (Estilo Make / Zapier)
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => loadTriggerSample(selectedTriggerIdx)}
+                          disabled={isLoadingSample}
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: '#0d9488',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}
+                        >
+                          <svg className={isLoadingSample ? 'spin-icon' : ''} width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                          {isLoadingSample ? 'Consultando...' : 'Recargar Muestra'}
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', maxHeight: '110px', overflowY: 'auto', padding: '0.2rem 0' }}>
+                        {Object.keys(sampleTriggerData).length > 0 ? (
+                          Object.entries(sampleTriggerData).map(([k, v]) => (
+                            <span key={k} style={{
+                              fontSize: '11px',
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              padding: '0.2rem 0.5rem',
+                              color: '#334155',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem'
+                            }}>
+                              <strong style={{ color: '#0f172a' }}>{k}:</strong>
+                              <span style={{ color: '#0d9488', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {String(v)}
+                              </span>
+                            </span>
+                          ))
+                        ) : (
+                          <span style={{ fontSize: '11px', color: '#94a3b8', fontStyle: 'italic' }}>
+                            {isLoadingSample ? 'Consultando el último registro disponible...' : 'Sin registros previos en esta cuenta.'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                       {(() => {
                         const isProcessWithTemplates = targetApp === 'process' && processTemplates.length > 0;
                         const targetAction = targetAppConfig.actions[selectedActionIdx];
-                        const activeFields = isProcessWithTemplates
-                          ? (processTemplates.find(t => t.id === selectedTemplateId)?.variables || []).filter((v: string) => v !== 'Miembro Involucrado (Email)')
-                          : (targetAction?.fields || []);
+                        
+                        let activeFields: string[] = [];
+                        if (isProcessWithTemplates) {
+                          const tVars = (processTemplates.find(t => t.id === selectedTemplateId)?.variables || []).filter((v: string) => v !== 'Miembro Involucrado (Email)');
+                          const extraProcessFields = [
+                            'ID de Referencia (Lead / Trigger ID)',
+                            'Teléfono del Cliente / Lead',
+                            'Email del Cliente / Lead'
+                          ];
+                          activeFields = [...tVars, ...extraProcessFields.filter(f => !tVars.includes(f))];
+                        } else {
+                          activeFields = targetAction?.fields || [];
+                        }
+
                         const requiredFields = isProcessWithTemplates 
                           ? [] 
                           : (targetAction?.requiredFields || []);
@@ -1078,9 +1448,17 @@ export default function IntegrationCard({
                                   }}
                                 >
                                   <option value="">{isRequired ? '-- Seleccionar Variable (Obligatorio) --' : '-- Sin asignar (Opcional) --'}</option>
-                                  {availOutputs.map((out: string) => (
-                                    <option key={out} value={out}>{out}</option>
-                                  ))}
+                                  {availOutputs.map((out: string) => {
+                                    const sampleVal = sampleTriggerData[out];
+                                    const sampleDisplay = sampleVal !== undefined && sampleVal !== null && sampleVal !== ''
+                                      ? ` — "${String(sampleVal).length > 25 ? String(sampleVal).substring(0, 25) + '...' : sampleVal}"`
+                                      : '';
+                                    return (
+                                      <option key={out} value={out}>
+                                        {out}{sampleDisplay}
+                                      </option>
+                                    );
+                                  })}
                                 </select>
                               ) : (
                                 <input
@@ -1119,7 +1497,7 @@ export default function IntegrationCard({
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
-                        <span>Guardar y Activar Automatización</span>
+                        <span>{editingRuleId ? 'Guardar Cambios de la Automatización' : 'Guardar y Activar Automatización'}</span>
                       </button>
                       <button
                         type="button"
@@ -1185,11 +1563,32 @@ export default function IntegrationCard({
                           <strong>Cuando:</strong> {trigName} ➔ <strong>Ejecutar:</strong> {actName}
                         </div>
 
-                        {/* Mappings preview without __templateId and with clean icons */}
+                        {/* Status Filter Indicator */}
+                        {rule.mappings?.['__filterStatus'] && (
+                          <span style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            color: '#b45309',
+                            background: '#fef3c7',
+                            border: '1px solid #fde68a',
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '6px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            marginTop: '0.2rem',
+                            width: 'fit-content'
+                          }}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                            Solo si estado = &ldquo;{rule.mappings['__filterStatus']}&rdquo;
+                          </span>
+                        )}
+
+                        {/* Mappings preview without __templateId and __filterStatus */}
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
                           {(() => {
                             const validMappings = Object.entries(rule.mappings)
-                              .filter(([k, v]) => k !== '__templateId' && v !== '' && v !== undefined && v !== null);
+                              .filter(([k, v]) => k !== '__templateId' && k !== '__filterStatus' && v !== '' && v !== undefined && v !== null);
                             
                             if (validMappings.length === 0) {
                               return (
@@ -1230,7 +1629,25 @@ export default function IntegrationCard({
                       </div>
 
                       {/* Rule Item Action Buttons */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          onClick={() => handleEditRule(rule)}
+                          className="btn-rule-test"
+                          title="Editar configuración de esta regla"
+                          style={{
+                            background: '#eff6ff',
+                            color: '#2563eb',
+                            border: '1px solid #bfdbfe'
+                          }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                          </svg>
+                          <span>Editar</span>
+                        </button>
+
                         <button
                           type="button"
                           onClick={() => handleTestRuleTrigger(rule)}

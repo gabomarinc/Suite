@@ -811,6 +811,40 @@ export async function createAutomationRule(data: {
   return rule;
 }
 
+export async function updateAutomationRule(id: string, data: {
+  sourceApp: string;
+  triggerIdx: number;
+  targetApp: string;
+  actionIdx: number;
+  mappings: any;
+  mappingTypes: any;
+}) {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  if (!isAuth) throw new Error("No autenticado");
+
+  const user = await getUser();
+  if (!user || !user.id) throw new Error("Usuario no encontrado");
+
+  const updated = await prisma.automationRule.update({
+    where: {
+      id,
+      userId: user.id
+    },
+    data: {
+      sourceApp: data.sourceApp,
+      triggerIdx: data.triggerIdx,
+      targetApp: data.targetApp,
+      actionIdx: data.actionIdx,
+      mappings: data.mappings,
+      mappingTypes: data.mappingTypes
+    }
+  });
+
+  revalidatePath('/automatizaciones');
+  return updated;
+}
+
 export async function deleteAutomationRule(id: string) {
   const { isAuthenticated, getUser } = getKindeServerSession();
   const isAuth = await isAuthenticated();
