@@ -14,7 +14,8 @@ import {
   getConnectedIntegrations,
   connectAppOneClick,
   disconnectApp,
-  fetchRealTriggerData
+  fetchRealTriggerData,
+  fetchAppStages
 } from '../app/automatizaciones/actions';
 import { ALL_APPS, APP_NAMES_MAP, type AppConfig } from '@/lib/appsConfig';
 
@@ -106,6 +107,34 @@ export default function IntegrationCard({
   // Make/Zapier Live Sample Data State
   const [sampleTriggerData, setSampleTriggerData] = useState<Record<string, any>>({});
   const [isLoadingSample, setIsLoadingSample] = useState(false);
+
+  // Pipeline / Board Stages State (dynamically fetched from source app)
+  const [availableStages, setAvailableStages] = useState<string[]>([]);
+  const [isLoadingStages, setIsLoadingStages] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadStages = async () => {
+      setIsLoadingStages(true);
+      try {
+        const stages = await fetchAppStages(app.code);
+        if (isMounted) {
+          setAvailableStages(stages);
+        }
+      } catch (err) {
+        console.error('Error fetching stages for app:', app.code, err);
+      } finally {
+        if (isMounted) setIsLoadingStages(false);
+      }
+    };
+
+    if (isExpanded) {
+      loadStages();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [app.code, isExpanded]);
 
   useEffect(() => {
     setRules(initialRules);
@@ -972,7 +1001,7 @@ export default function IntegrationCard({
                             type="button"
                             onClick={() => {
                               if (!filterStatus) {
-                                const defaultSug = app.code === 'leadshub' ? 'Calificado' : app.code === 'bills' ? 'Pagada' : 'En Proceso';
+                                const defaultSug = availableStages[1] || availableStages[0] || (app.code === 'leadshub' ? 'Asignado' : app.code === 'bills' ? 'Pagada' : 'En Proceso');
                                 setFilterStatus(defaultSug);
                               }
                             }}
@@ -993,44 +1022,73 @@ export default function IntegrationCard({
 
                         {filterStatus !== '' && (
                           <div>
-                            <input
-                              type="text"
-                              placeholder="Escribe el nombre del estado (ej: Calificado, Ganado, Pagada, etc.)"
-                              value={filterStatus}
-                              onChange={(e) => setFilterStatus(e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '0.55rem 0.85rem',
-                                borderRadius: '8px',
-                                border: '1.5px solid #00a884',
-                                background: '#ffffff',
-                                fontSize: '0.85rem',
-                                fontWeight: 600,
-                                color: '#0f172a',
-                                outline: 'none'
-                              }}
-                            />
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.45rem' }}>
-                              <span style={{ fontSize: '10px', fontWeight: 600, color: '#94a3b8', alignSelf: 'center' }}>Sugerencias:</span>
-                              {(app.code === 'leadshub' 
-                                ? ['Calificado', 'Cotización', 'Negociación', 'Ganado', 'Perdido', 'Nuevo']
-                                : app.code === 'bills' 
-                                ? ['Pagada', 'Abonada', 'Enviada', 'Incobrable', 'Cancelada']
-                                : ['Por Hacer', 'En Proceso', 'En Revisión', 'Completado']
-                              ).map(sug => (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                              <input
+                                type="text"
+                                list="available-stages-list"
+                                placeholder={isLoadingStages ? `Cargando estados de ${app.name}...` : `Escribe o selecciona un estado real de ${app.name}`}
+                                value={filterStatus}
+                                onChange={(e) => setFilterStatus(e.target.value)}
+                                style={{
+                                  flex: 1,
+                                  padding: '0.55rem 0.85rem',
+                                  borderRadius: '8px',
+                                  border: '1.5px solid #00a884',
+                                  background: '#ffffff',
+                                  fontSize: '0.85rem',
+                                  fontWeight: 600,
+                                  color: '#0f172a',
+                                  outline: 'none'
+                                }}
+                              />
+                              {availableStages.length > 0 && (
+                                <select
+                                  value={filterStatus}
+                                  onChange={(e) => setFilterStatus(e.target.value)}
+                                  style={{
+                                    padding: '0.55rem 0.75rem',
+                                    borderRadius: '8px',
+                                    border: '1.5px solid #cbd5e1',
+                                    background: '#ffffff',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 600,
+                                    color: '#0f172a',
+                                    outline: 'none'
+                                  }}
+                                >
+                                  <option value="">-- Seleccionar de la lista --</option>
+                                  {availableStages.map(st => (
+                                    <option key={st} value={st}>{st}</option>
+                                  ))}
+                                </select>
+                              )}
+                              <datalist id="available-stages-list">
+                                {availableStages.map(st => (
+                                  <option key={st} value={st} />
+                                ))}
+                              </datalist>
+                            </div>
+
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.45rem', alignItems: 'center' }}>
+                              <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+                                {isLoadingStages ? `Cargando estados reales de ${app.name}...` : `Columnas / Estados reales de ${app.name}:`}
+                              </span>
+                              {availableStages.map(sug => (
                                 <button
                                   key={sug}
                                   type="button"
                                   onClick={() => setFilterStatus(sug)}
                                   style={{
                                     fontSize: '11px',
-                                    fontWeight: 600,
-                                    padding: '2px 8px',
+                                    fontWeight: 700,
+                                    padding: '3px 9px',
                                     borderRadius: '6px',
                                     background: filterStatus.toLowerCase() === sug.toLowerCase() ? '#00a884' : '#ffffff',
                                     color: filterStatus.toLowerCase() === sug.toLowerCase() ? '#ffffff' : '#334155',
-                                    border: filterStatus.toLowerCase() === sug.toLowerCase() ? '1px solid #00a884' : '1px solid #cbd5e1',
-                                    cursor: 'pointer'
+                                    border: filterStatus.toLowerCase() === sug.toLowerCase() ? '1.5px solid #00a884' : '1px solid #cbd5e1',
+                                    cursor: 'pointer',
+                                    boxShadow: filterStatus.toLowerCase() === sug.toLowerCase() ? '0 2px 6px rgba(0, 168, 132, 0.25)' : 'none'
                                   }}
                                 >
                                   {sug}

@@ -560,9 +560,9 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
         'Email del Lead': user.email || 'carlos.rodriguez@empresa.com',
         'Teléfono del Lead': '+507 6555-8888',
         'Origen / Canal': 'WhatsApp Business',
-        'Estado de Embudo': 'Calificado',
-        'Nuevo Estado de Embudo': 'Ganado',
-        'Estado Anterior': 'Cotización',
+        'Estado de Embudo': 'Nuevo',
+        'Nuevo Estado de Embudo': 'Asignado',
+        'Estado Anterior': 'Nuevo',
         'Puntaje de Scoring': '95',
         'Etiquetas del Lead': 'VIP, Corporativo',
         'Etiquetas Nuevas Añadidas': 'VIP, Cliente Potencial',
@@ -861,6 +861,56 @@ export async function deleteAutomationRule(id: string) {
   });
 
   revalidatePath('/automatizaciones');
+}
+
+export async function fetchAppStages(appCode: string): Promise<string[]> {
+  if (appCode === 'leadshub') {
+    const { isAuthenticated, getUser } = getKindeServerSession();
+    const isAuth = await isAuthenticated();
+    const user = isAuth ? await getUser() : null;
+
+    const leadshubUrl = process.env.NEXT_PUBLIC_LEADSHUB_URL || 'https://leadshub.konsul.digital';
+    const sharedSecret = process.env.KONSUL_ECOSYSTEM_SECRET_KEY || 'konsul_ecosystem_secret_2026';
+
+    try {
+      const res = await fetch(`${leadshubUrl}/api/v1/contacts/status`, {
+        method: 'GET',
+        headers: {
+          'x-api-key': sharedSecret,
+          ...(user?.email ? { 'x-user-email': user.email } : {}),
+          'x-source-app': 'suite'
+        },
+        cache: 'no-store'
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const cols = json.data || json;
+        if (Array.isArray(cols) && cols.length > 0) {
+          return cols.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
+        }
+      }
+    } catch (err) {
+      console.warn('[fetchAppStages leadshub error]', err);
+    }
+
+    // Default real Kanban columns in LeadsHUB
+    return ['Nuevo', 'Asignado', 'Finalizado'];
+  }
+
+  if (appCode === 'bills') {
+    return ['Borrador', 'Enviada', 'Seguimiento', 'Pagada', 'Abonada', 'Incobrable', 'Cancelada'];
+  }
+
+  if (appCode === 'process') {
+    return ['Por Hacer', 'En Proceso', 'En Revisión', 'Completado', 'Bloqueado'];
+  }
+
+  if (appCode === 'kredit') {
+    return ['Pendiente', 'En Revisión', 'Aprobado', 'Rechazado'];
+  }
+
+  return [];
 }
 
 export async function toggleAutomationRule(id: string, currentStatus: boolean) {

@@ -271,21 +271,24 @@ export async function POST(req: Request) {
       // 1. Check condition / filter status if rule specifies a specific status condition
       const filterStatus = mappings['__filterStatus'];
       if (filterStatus && filterStatus.trim() !== '' && filterStatus.toLowerCase() !== 'any') {
-        const incomingStatus = (
+        const rawIncoming = (
           data['Nuevo Estado de Embudo'] || 
           data['newStatus'] || 
+          data['contact']?.prospectStatus ||
           data['Estado de Embudo'] || 
           data['prospectStatus'] || 
           data['Nuevo Estado'] || 
           data['Columna Actual'] || 
           data['status'] || 
           ''
-        ).toString().toLowerCase().trim();
+        ).toString().trim();
 
-        const targetStatus = filterStatus.toLowerCase().trim();
-        if (incomingStatus !== targetStatus && !incomingStatus.includes(targetStatus)) {
-          // Status condition not met (e.g. lead changed to 'Cotización' but rule only triggers for 'Calificado')
-          console.log(`[Rule ${rule.id}] Skipped: status filter '${filterStatus}' did not match incoming status '${incomingStatus}'`);
+        const normIncoming = rawIncoming.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const normTarget = filterStatus.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+        if (normIncoming !== normTarget && !normIncoming.includes(normTarget) && !normTarget.includes(normIncoming)) {
+          // Status condition not met
+          console.log(`[Rule ${rule.id}] Skipped: status filter '${filterStatus}' did not match incoming status '${rawIncoming}'`);
           continue;
         }
       }
