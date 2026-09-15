@@ -320,7 +320,7 @@ export default function IntegrationCard({
 
     actionFields.forEach((field: string) => {
       finalMappings[field] = mappingValues[field] || '';
-      finalTypes[field] = mappingTypes[field] || 'static';
+      finalTypes[field] = mappingTypes[field] || 'field';
     });
 
     if (isProcessWithTemplates && selectedTemplateId) {

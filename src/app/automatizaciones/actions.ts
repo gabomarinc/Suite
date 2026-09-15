@@ -289,12 +289,16 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
     }
   });
 
-  const serviceKey = integration?.serviceKey || `konsul_sso_${sourceApp}`;
+  const sharedSecret = process.env.KONSUL_ECOSYSTEM_SECRET_KEY || process.env.INTERNAL_API_KEY || 'konsul_ecosystem_secret_key';
+  const serviceKey = integration?.serviceKey || sharedSecret;
+  const isLhKey = serviceKey.startsWith('lh_live_');
   const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
-    'x-api-key': serviceKey,
+    'x-api-key': isLhKey ? serviceKey : sharedSecret,
     'x-user-id': user.id,
-    'x-user-email': user.email || ''
+    'x-user-email': user.email || '',
+    'x-source-app': 'suite',
+    ...((serviceKey && !isLhKey && serviceKey !== sharedSecret) ? { 'x-workspace-id': serviceKey } : {})
   };
 
   // 1. BILLS
@@ -488,10 +492,17 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
 
     // Contactos / Leads
     try {
-      const res = await fetch(`${leadshubUrl}/api/v1/contacts`, { headers: authHeaders, cache: 'no-store' });
+      const emailParam = user.email ? `?email=${encodeURIComponent(user.email)}` : '';
+      let res = await fetch(`${leadshubUrl}/api/v1/contacts${emailParam}`, { headers: authHeaders, cache: 'no-store' });
+      
+      if (!res.ok) {
+        res = await fetch(`${leadshubUrl}/api/v1/contacts`, { headers: authHeaders, cache: 'no-store' });
+      }
+
       if (res.ok) {
         const json = await res.json();
-        const contacts = Array.isArray(json) ? json : (json.data || json.contacts || []);
+        const contactData = json.data || json;
+        const contacts = Array.isArray(contactData) ? contactData : (contactData.contacts ? contactData.contacts : (contactData.id ? [contactData] : []));
         if (contacts.length > 0) {
           const l = contacts[0];
           const data: Record<string, string> = {
@@ -518,18 +529,18 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
             'Canal (WhatsApp / Instagram / Web)': l.channel || 'WhatsApp',
             'Motivo de Transferencia': 'Solicita cotización personalizada con asesor',
             'Asesor Asignado': l.assignedUser?.name || userName || 'Gabriel Marín',
-            'Último Mensaje del Cliente': 'Hola, quiero contratar el plan hoy mismo',
+            'Último Mensaje del Cliente': 'Hola, quiero avanzar con la propuesta',
             'Estado de Conversación': 'Cerrada',
             'Fecha de Cierre': new Date().toISOString(),
             'Servicio o Producto de Interés': 'Suite Empresarial Kônsul',
             'Presupuesto Mencionado': '$500 USD',
             'Nivel de Urgencia': 'Alto',
-            'Resumen de Necesidad': 'Automatización de facturación y CRM con WhatsApp'
+            'Resumen de Necesidad': 'Automatización de procesos con IA'
           };
           return {
             success: true,
             isRealData: true,
-            summary: `Contacto real en LeadsHUB: "${data['Nombre del Lead']}" (${data['Teléfono del Lead']})`,
+            summary: `Contacto real en LeadsHUB: "${data['Nombre del Lead']}" (${data['Teléfono del Lead'] || data['Email del Lead']})`,
             data
           };
         }

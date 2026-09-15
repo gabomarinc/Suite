@@ -292,23 +292,33 @@ export async function POST(req: Request) {
       for (const [field, targetVal] of Object.entries(mappings)) {
         if (field === '__templateId') continue;
         
-        const type = mappingTypes[field] || 'field';
-        if (type === 'field') {
+        const rawType = mappingTypes[field];
+        // AUTO-HEAL: If rawType was 'static' but targetVal exists in enrichedData or matches known trigger outputs,
+        // it was saved as 'static' due to the previous default fallback bug, so treat it as dynamic field!
+        const isDynamicField = rawType === 'field' || (!rawType) || (enrichedData[targetVal] !== undefined);
+        
+        if (isDynamicField) {
           let val = enrichedData[targetVal];
           
           // Smart alias resolution if not found under exact key
           if (val === undefined || val === '') {
-            const lowerTarget = targetVal.toLowerCase();
+            const lowerTarget = (targetVal || '').toLowerCase();
             if (lowerTarget.includes('documento') || lowerTarget.includes('adjunto') || lowerTarget.includes('url') || lowerTarget.includes('pdf')) {
               val = enrichedData['Documento Adjunto (URL / PDF)'] || enrichedData['Documento Adjunto (URL)'] || enrichedData['Documento Adjunto'] || enrichedData['receiptUrl'] || enrichedData['Enlace de Factura en Bills'];
+            } else if (lowerTarget.includes('lead') && lowerTarget.includes('nombre')) {
+              val = enrichedData['Nombre del Lead'] || enrichedData['Nombre del Cliente'] || enrichedData['name'];
             } else if (lowerTarget.includes('cliente') && lowerTarget.includes('nombre')) {
-              val = enrichedData['Nombre del Cliente'] || enrichedData['clientName'] || enrichedData['name'];
+              val = enrichedData['Nombre del Cliente'] || enrichedData['Nombre del Lead'] || enrichedData['clientName'] || enrichedData['name'];
             } else if (lowerTarget.includes('email') || lowerTarget.includes('correo')) {
-              val = enrichedData['Email del Cliente'] || enrichedData['clientEmail'] || enrichedData['email'];
+              val = enrichedData['Email del Lead'] || enrichedData['Email del Cliente'] || enrichedData['clientEmail'] || enrichedData['email'];
+            } else if (lowerTarget.includes('teléfono') || lowerTarget.includes('telefono') || lowerTarget.includes('phone')) {
+              val = enrichedData['Teléfono del Lead'] || enrichedData['Teléfono del Cliente'] || enrichedData['phone'];
             } else if (lowerTarget.includes('total') || lowerTarget.includes('monto')) {
               val = enrichedData['Monto Total'] || enrichedData['total'] || enrichedData['amount'];
-            } else if (lowerTarget.includes('concepto') || lowerTarget.includes('descrip')) {
-              val = enrichedData['Concepto de Venta'] || enrichedData['concept'] || enrichedData['description'];
+            } else if (lowerTarget.includes('concepto') || lowerTarget.includes('descrip') || lowerTarget.includes('resumen') || lowerTarget.includes('nota')) {
+              val = enrichedData['Resumen de IA'] || enrichedData['Notas / Mensaje'] || enrichedData['Concepto de Venta'] || enrichedData['concept'] || enrichedData['summary'];
+            } else if (lowerTarget.includes('fecha') || lowerTarget.includes('date') || lowerTarget.includes('inicio') || lowerTarget.includes('actualiz')) {
+              val = enrichedData['Fecha de Actualización'] || enrichedData['Fecha de Registro'] || enrichedData['Fecha de Creación'] || new Date().toISOString();
             }
           }
 
