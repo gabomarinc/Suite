@@ -55,12 +55,24 @@ export async function POST(req: Request) {
       const event = (rawBody.event || triggerName || '').toString().trim();
       const rawData = rawBody.data || {};
       const contact = (typeof rawData.contact === 'object' && rawData.contact !== null) ? rawData.contact : rawData;
+      const customData = (contact.customData && typeof contact.customData === 'object') ? contact.customData : {};
+      const companyVal = contact.company 
+        || contact.companyName 
+        || customData.company 
+        || customData.company_name 
+        || customData.empresa 
+        || contact.jobCompany 
+        || rawData.company 
+        || rawData.companyName 
+        || '';
 
       if (event === 'contact:created' || event === 'lead.created' || event.toLowerCase().includes('nuevo lead')) {
         triggerName = 'Nuevo Lead Registrado (Chat / Form)';
         data = {
           'ID del Lead': contact.id || contact.contactId || '',
           'Nombre del Lead': contact.name || contact.contactName || '',
+          'Nombre de Empresa': companyVal,
+          'Empresa': companyVal,
           'Email del Lead': contact.email || contact.contactEmail || '',
           'Teléfono del Lead': contact.phone || contact.contactPhone || '',
           'Origen / Canal': rawData.channel || contact.channel || contact.source || 'WhatsApp',
@@ -77,6 +89,8 @@ export async function POST(req: Request) {
         data = {
           'ID del Lead': contact.id || contact.contactId || '',
           'Nombre del Lead': contact.name || contact.contactName || '',
+          'Nombre de Empresa': companyVal,
+          'Empresa': companyVal,
           'Email del Lead': contact.email || contact.contactEmail || '',
           'Teléfono del Lead': contact.phone || contact.contactPhone || '',
           'Estado Anterior': rawData.prevStatus || '',
@@ -94,6 +108,8 @@ export async function POST(req: Request) {
         data = {
           'ID del Lead': contact.id || contact.contactId || '',
           'Nombre del Lead': contact.name || '',
+          'Nombre de Empresa': companyVal,
+          'Empresa': companyVal,
           'Email del Lead': contact.email || '',
           'Teléfono del Lead': contact.phone || '',
           'Etiquetas Nuevas Añadidas': addedTagsStr,
@@ -113,6 +129,8 @@ export async function POST(req: Request) {
           'Fecha de Actividad': act.createdAt || act.date || act.fecha || rawBody.timestamp || new Date().toISOString(),
           'ID del Lead': contact.id || contact.contactId || '',
           'Nombre del Lead': contact.name || '',
+          'Nombre de Empresa': companyVal,
+          'Empresa': companyVal,
           'Email del Lead': contact.email || '',
           'Teléfono del Lead': contact.phone || '',
           'Estado de Embudo': contact.prospectStatus || contact.status || '',
@@ -127,6 +145,8 @@ export async function POST(req: Request) {
           'Fecha y Hora de Fin': rawData.endTime || '',
           'Enlace de Reunión / Ubicación': rawData.location || rawData.meetUrl || '',
           'Nombre del Lead': contact.name || rawData.contactName || '',
+          'Nombre de Empresa': companyVal,
+          'Empresa': companyVal,
           'Email del Lead': contact.email || rawData.contactEmail || '',
           'Teléfono del Lead': contact.phone || rawData.contactPhone || '',
           'Categoría de Cita': rawData.category || 'Demostración',
@@ -138,6 +158,8 @@ export async function POST(req: Request) {
           'ID de Conversación': rawData.conversationId || rawData.id || '',
           'ID del Lead': contact.id || rawData.contactId || '',
           'Nombre del Lead': contact.name || rawData.contactName || '',
+          'Nombre de Empresa': companyVal,
+          'Empresa': companyVal,
           'Email del Lead': contact.email || rawData.contactEmail || '',
           'Teléfono del Lead': contact.phone || rawData.contactPhone || '',
           'Departamento / Motivo': rawData.department || rawData.reason || 'Solicita atención humana',
@@ -152,6 +174,8 @@ export async function POST(req: Request) {
           'ID de Conversación': rawData.conversationId || rawData.id || '',
           'ID del Lead': contact.id || rawData.contactId || '',
           'Nombre del Lead': contact.name || rawData.contactName || '',
+          'Nombre de Empresa': companyVal,
+          'Empresa': companyVal,
           'Email del Lead': contact.email || rawData.contactEmail || '',
           'Teléfono del Lead': contact.phone || rawData.contactPhone || '',
           'Estado de Conversación': rawData.status || 'Cerrada',
@@ -165,6 +189,8 @@ export async function POST(req: Request) {
         data = {
           'ID del Lead': contact.id || rawData.contactId || '',
           'Nombre del Lead': contact.name || '',
+          'Nombre de Empresa': companyVal,
+          'Empresa': companyVal,
           'Email del Lead': contact.email || '',
           'Teléfono del Lead': contact.phone || '',
           'Servicio o Producto de Interés': rawData.service || rawData.interest || '',
@@ -342,6 +368,8 @@ export async function POST(req: Request) {
               val = enrichedData['Monto Total'] || enrichedData['total'] || enrichedData['amount'];
             } else if (lowerTarget.includes('concepto') || lowerTarget.includes('descrip') || lowerTarget.includes('resumen') || lowerTarget.includes('nota')) {
               val = enrichedData['Resumen de IA'] || enrichedData['Notas / Mensaje'] || enrichedData['Concepto de Venta'] || enrichedData['concept'] || enrichedData['summary'];
+            } else if (lowerTarget.includes('empresa') || lowerTarget.includes('company') || lowerTarget.includes('negocio') || lowerTarget.includes('organiza')) {
+              val = enrichedData['Nombre de Empresa'] || enrichedData['Empresa'] || enrichedData['company'] || enrichedData['companyName'] || enrichedData['company_name'] || '';
             } else if (lowerTarget.includes('fecha') || lowerTarget.includes('date') || lowerTarget.includes('inicio') || lowerTarget.includes('actualiz')) {
               val = enrichedData['Fecha de Actualización'] || enrichedData['Fecha de Registro'] || enrichedData['Fecha de Creación'] || new Date().toISOString();
             }
@@ -458,6 +486,9 @@ export async function POST(req: Request) {
                 ...resolvedVariables,
                 trigger_id: data['ID del Lead'] || data['ID de Factura / Documento'] || data['ID de Tarea'] || data['ID de Solicitud'] || data['id'] || '',
                 lead_id: data['ID del Lead'] || '',
+                company: resolvedVariables['Nombre de Empresa'] || data['Nombre de Empresa'] || data['Empresa'] || '',
+                company_name: resolvedVariables['Nombre de Empresa'] || data['Nombre de Empresa'] || data['Empresa'] || '',
+                empresa: resolvedVariables['Nombre de Empresa'] || data['Nombre de Empresa'] || data['Empresa'] || '',
                 contact_phone: data['Teléfono del Lead'] || data['Teléfono del Cliente'] || data['Teléfono'] || '',
                 contact_email: data['Email del Lead'] || data['Email del Cliente'] || data['Email'] || '',
                 contact_name: data['Nombre del Lead'] || data['Nombre del Cliente'] || ''
@@ -523,7 +554,6 @@ export async function POST(req: Request) {
       } else if (targetApp === 'bills') {
         const actionConfig = ALL_APPS.bills.actions[rule.actionIdx];
         const actionName = actionConfig?.name || 'Acción en Bills';
-
         const billsUrl = process.env.NEXT_PUBLIC_BILLS_URL || 'https://bills.konsul.digital';
         let endpoint = `${billsUrl}/api/v1/invoices`;
         let method = 'POST';
@@ -533,10 +563,12 @@ export async function POST(req: Request) {
           endpoint = `${billsUrl}/api/v1/invoices`;
           method = 'POST';
           payload = {
-            clientName: resolvedVariables['Nombre del Cliente'],
+            clientName: resolvedVariables['Nombre del Cliente'] || resolvedVariables['Nombre de Empresa'],
+            company: resolvedVariables['Nombre de Empresa'] || '',
             clientEmail: resolvedVariables['Email del Cliente'],
-            total: resolvedVariables['Monto Total'],
+            total: parseFloat(resolvedVariables['Monto Total'] || '0'),
             concept: resolvedVariables['Concepto de Venta'],
+            notes: (resolvedVariables['Nombre de Empresa'] ? `Empresa: ${resolvedVariables['Nombre de Empresa']}\n` : '') + (resolvedVariables['Notas'] || ''),
             type: 'Invoice',
             status: 'Creada'
           };
@@ -550,11 +582,14 @@ export async function POST(req: Request) {
         } else if (actionName === 'Crear o Actualizar Cliente') {
           endpoint = `${billsUrl}/api/v1/clients`;
           method = 'POST';
+          const companyStr = resolvedVariables['Nombre de Empresa'] || data['Nombre de Empresa'] || data['Empresa'] || '';
           payload = {
-            name: resolvedVariables['Nombre del Cliente'],
-            email: resolvedVariables['Email del Cliente'],
-            phone: resolvedVariables['Teléfono'],
-            notes: resolvedVariables['Notas']
+            name: resolvedVariables['Nombre del Cliente'] || companyStr || data['Nombre del Lead'] || 'Cliente',
+            company: companyStr,
+            email: resolvedVariables['Email del Cliente'] || data['Email del Lead'] || '',
+            phone: resolvedVariables['Teléfono'] || data['Teléfono del Lead'] || '',
+            tax_id: resolvedVariables['RUC / Cédula'] || '',
+            notes: (companyStr ? `Empresa: ${companyStr}\n` : '') + (resolvedVariables['Notas'] || '')
           };
         } else if (actionName === 'Añadir etiqueta a un cliente') {
           endpoint = `${billsUrl}/api/v1/clients`;
@@ -764,8 +799,10 @@ export async function POST(req: Request) {
           endpoint = `${leadshubUrl}/api/v1/contacts`;
           const phoneVal = resolvedVariables['Teléfono del Lead'] || resolvedVariables['Teléfono del Cliente'] || resolvedVariables['Teléfono'] || undefined;
           const emailVal = resolvedVariables['Email del Lead'] || resolvedVariables['Email del Cliente'] || undefined;
+          const companyVal = resolvedVariables['Nombre de Empresa'] || data['Nombre de Empresa'] || data['Empresa'] || undefined;
           requestBody = {
             name: resolvedVariables['Nombre del Lead'] || resolvedVariables['Nombre del Cliente'] || '',
+            ...(companyVal ? { company: companyVal } : {}),
             ...(phoneVal ? { phone: phoneVal } : {}),
             ...(emailVal ? { email: emailVal } : {}),
             identifier: phoneVal || emailVal || '',
@@ -775,7 +812,10 @@ export async function POST(req: Request) {
               : [],
             leadScore: resolvedVariables['Puntaje de Scoring'] ? parseInt(resolvedVariables['Puntaje de Scoring']) : undefined,
             notes: resolvedVariables['Notas / Historial'] || resolvedVariables['Notas'] || '',
-            customData: resolvedVariables
+            customData: {
+              ...resolvedVariables,
+              ...(companyVal ? { company: companyVal } : {})
+            }
           };
         } else if (actionName.includes('Mover Lead de Estado')) {
           endpoint = `${leadshubUrl}/api/v1/contacts/status`;

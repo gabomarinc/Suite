@@ -214,7 +214,7 @@ export const ALL_APPS: Record<string, AppConfig> = {
       { 
         name: 'Crear Factura o Cotización', 
         description: 'POST /api/v1/invoices - Genera factura o cotización.', 
-        fields: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta', 'Notas'],
+        fields: ['Nombre del Cliente', 'Nombre de Empresa', 'Email del Cliente', 'Monto Total', 'Concepto de Venta', 'Notas'],
         requiredFields: ['Nombre del Cliente', 'Monto Total']
       },
       { 
@@ -226,7 +226,7 @@ export const ALL_APPS: Record<string, AppConfig> = {
       { 
         name: 'Crear o Actualizar Cliente', 
         description: 'POST /api/v1/clients - Registra un prospecto.', 
-        fields: ['Nombre del Cliente', 'Email del Cliente', 'Teléfono', 'RUC / Cédula', 'Notas'],
+        fields: ['Nombre del Cliente', 'Nombre de Empresa', 'Email del Cliente', 'Teléfono', 'RUC / Cédula', 'Notas'],
         requiredFields: ['Nombre del Cliente']
       },
       { 
@@ -317,6 +317,7 @@ export const ALL_APPS: Record<string, AppConfig> = {
         outputs: [
           'ID del Lead',
           'Nombre del Lead', 
+          'Nombre de Empresa',
           'Email del Lead', 
           'Teléfono del Lead',
           'Origen / Canal',
@@ -334,6 +335,7 @@ export const ALL_APPS: Record<string, AppConfig> = {
         outputs: [
           'ID del Lead',
           'Nombre del Lead', 
+          'Nombre de Empresa',
           'Email del Lead', 
           'Teléfono del Lead',
           'Estado Anterior',
@@ -350,6 +352,7 @@ export const ALL_APPS: Record<string, AppConfig> = {
         outputs: [
           'ID del Lead',
           'Nombre del Lead', 
+          'Nombre de Empresa',
           'Email del Lead', 
           'Teléfono del Lead',
           'Etiquetas Nuevas Añadidas',
@@ -369,6 +372,7 @@ export const ALL_APPS: Record<string, AppConfig> = {
           'Fecha de Actividad',
           'ID del Lead',
           'Nombre del Lead', 
+          'Nombre de Empresa',
           'Email del Lead', 
           'Teléfono del Lead',
           'Estado de Embudo'
@@ -384,6 +388,7 @@ export const ALL_APPS: Record<string, AppConfig> = {
           'Fecha y Hora de Fin',
           'Enlace de Reunión / Ubicación',
           'Nombre del Lead',
+          'Nombre de Empresa',
           'Email del Lead',
           'Teléfono del Lead',
           'Categoría de Cita'
@@ -395,8 +400,9 @@ export const ALL_APPS: Record<string, AppConfig> = {
         outputs: [
           'ID de Conversación',
           'ID del Lead',
-          'Nombre del Lead',
-          'Email del Lead',
+          'Nombre del Lead', 
+          'Nombre de Empresa',
+          'Email del Lead', 
           'Teléfono del Lead',
           'Departamento / Motivo',
           'Asesor Asignado',
@@ -410,8 +416,9 @@ export const ALL_APPS: Record<string, AppConfig> = {
         outputs: [
           'ID de Conversación',
           'ID del Lead',
-          'Nombre del Lead',
-          'Email del Lead',
+          'Nombre del Lead', 
+          'Nombre de Empresa',
+          'Email del Lead', 
           'Teléfono del Lead',
           'Estado de Conversación',
           'Estado de Embudo',
@@ -425,6 +432,7 @@ export const ALL_APPS: Record<string, AppConfig> = {
         outputs: [
           'ID del Lead',
           'Nombre del Lead', 
+          'Nombre de Empresa',
           'Email del Lead', 
           'Teléfono del Lead',
           'Servicio o Producto de Interés',
@@ -438,7 +446,7 @@ export const ALL_APPS: Record<string, AppConfig> = {
       { 
         name: 'Crear o Actualizar Lead en CRM', 
         description: 'Inserta o sincroniza los datos de un prospecto en el CRM central de LeadsHUB.', 
-        fields: ['Nombre del Lead', 'Email del Lead', 'Teléfono del Lead', 'Estado de Embudo', 'Etiquetas (separadas por coma)', 'Notas / Historial', 'Puntaje de Scoring'],
+        fields: ['Nombre del Lead', 'Nombre de Empresa', 'Email del Lead', 'Teléfono del Lead', 'Estado de Embudo', 'Etiquetas (separadas por coma)', 'Notas / Historial', 'Puntaje de Scoring'],
         requiredFields: ['Nombre del Lead']
       },
       { 

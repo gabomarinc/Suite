@@ -505,9 +505,19 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
         const contacts = Array.isArray(contactData) ? contactData : (contactData.contacts ? contactData.contacts : (contactData.id ? [contactData] : []));
         if (contacts.length > 0) {
           const l = contacts[0];
+          const customData = (l.customData && typeof l.customData === 'object') ? l.customData : {};
+          const companyName = l.company 
+            || l.companyName 
+            || customData.company 
+            || customData.company_name 
+            || customData.empresa 
+            || l.jobCompany 
+            || '';
           const data: Record<string, string> = {
             'ID del Lead': String(l.id || 'lead_real_1'),
             'Nombre del Lead': l.name || 'Lead LeadsHUB',
+            'Nombre de Empresa': companyName || 'Empresa del Lead',
+            'Empresa': companyName || 'Empresa del Lead',
             'Email del Lead': l.email || user.email || '',
             'Teléfono del Lead': l.phone || '+507 6555-8888',
             'Origen / Canal': l.source || l.channel || 'WhatsApp',
@@ -557,6 +567,8 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
       data: {
         'ID del Lead': 'lead_lh_8892',
         'Nombre del Lead': userName || 'Carlos Rodríguez',
+        'Nombre de Empresa': 'Kônsul Digital Solutions',
+        'Empresa': 'Kônsul Digital Solutions',
         'Email del Lead': user.email || 'carlos.rodriguez@empresa.com',
         'Teléfono del Lead': '+507 6555-8888',
         'Origen / Canal': 'WhatsApp Business',
