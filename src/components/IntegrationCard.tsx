@@ -297,9 +297,22 @@ export default function IntegrationCard({
   const handleAddRule = async (e: React.FormEvent) => {
     e.preventDefault();
     const isProcessWithTemplates = targetApp === 'process' && processTemplates.length > 0;
+    const targetAction = targetAppConfig.actions[selectedActionIdx];
     const actionFields = isProcessWithTemplates
       ? (processTemplates.find(t => t.id === selectedTemplateId)?.variables || []).filter((v: string) => v !== 'Miembro Involucrado (Email)')
-      : (targetAppConfig.actions[selectedActionIdx]?.fields || []);
+      : (targetAction?.fields || []);
+    const requiredFields = isProcessWithTemplates ? [] : (targetAction?.requiredFields || []);
+
+    // Check only indispensable / required fields
+    const missingFields = requiredFields.filter((f: string) => {
+      const val = mappingValues[f];
+      return !val || (typeof val === 'string' && val.trim() === '');
+    });
+
+    if (missingFields.length > 0) {
+      alert(`Por favor completa las siguientes variables indispensables:\n• ${missingFields.join('\n• ')}`);
+      return;
+    }
     
     // Build mappings object
     const finalMappings: Record<string, string> = {};
@@ -343,16 +356,17 @@ export default function IntegrationCard({
   const handleTestRuleTrigger = async (rule: AutomationRule) => {
     const srcAppObj = ALL_APPS[rule.sourceApp];
     const trigName = srcAppObj?.triggers[rule.triggerIdx]?.name || '';
-    const targetAppName = ALL_APPS[rule.targetApp]?.name || rule.targetApp;
+    const targetAppObj = ALL_APPS[rule.targetApp];
+    const actName = targetAppObj?.actions[rule.actionIdx]?.name || '';
+    const targetAppName = targetAppObj?.name || rule.targetApp;
 
     setTestingRuleId(rule.id);
-
     try {
-      // 1. Obtener datos reales de la base de datos de la app origen según el disparador
+      // 1. Obtener datos reales dinámicos
       const realRes = await fetchRealTriggerData(rule.sourceApp, rule.triggerIdx, trigName);
       const triggerData = realRes.data || {};
 
-      // 2. Disparar el motor de automatizaciones con los datos reales
+      // 2. Disparar el endpoint con los datos reales
       const response = await fetch('/api/v1/automations/trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -372,7 +386,7 @@ export default function IntegrationCard({
         const mappingTypes = (rule.mappingTypes as Record<string, 'field' | 'static'>) || {};
 
         const appliedLines = Object.entries(mappings)
-          .filter(([k]) => k !== '__templateId')
+          .filter(([k, v]) => k !== '__templateId' && v !== '' && v !== undefined && v !== null)
           .map(([targetField, sourceField]) => {
             const isField = (mappingTypes[targetField] || 'field') === 'field';
             const value = isField ? ((triggerData as any)[sourceField] || `[${sourceField}]`) : sourceField;
@@ -981,9 +995,13 @@ export default function IntegrationCard({
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                       {(() => {
                         const isProcessWithTemplates = targetApp === 'process' && processTemplates.length > 0;
+                        const targetAction = targetAppConfig.actions[selectedActionIdx];
                         const activeFields = isProcessWithTemplates
                           ? (processTemplates.find(t => t.id === selectedTemplateId)?.variables || []).filter((v: string) => v !== 'Miembro Involucrado (Email)')
-                          : (targetAppConfig.actions[selectedActionIdx]?.fields || []);
+                          : (targetAction?.fields || []);
+                        const requiredFields = isProcessWithTemplates 
+                          ? [] 
+                          : (targetAction?.requiredFields || []);
                           
                         if (activeFields.length === 0) {
                           return (
@@ -996,6 +1014,7 @@ export default function IntegrationCard({
                         return activeFields.map((field: string) => {
                           const mType = mappingTypes[field] || 'field';
                           const availOutputs = currentTrigger.outputs || [];
+                          const isRequired = requiredFields.includes(field);
                           
                           return (
                             <div key={field} style={{
@@ -1006,11 +1025,22 @@ export default function IntegrationCard({
                               background: '#f8fafc',
                               padding: '0.65rem 0.85rem',
                               borderRadius: '10px',
-                              border: '1px solid #e2e8f0'
+                              border: isRequired ? '1px solid #e2e8f0' : '1px dashed #cbd5e1'
                             }}>
-                              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>
-                                {field}
-                              </span>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>
+                                  {field}
+                                </span>
+                                {isRequired ? (
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', padding: '1px 6px', borderRadius: '4px', width: 'fit-content' }}>
+                                    * Obligatorio
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 500, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px', width: 'fit-content' }}>
+                                    (Opcional)
+                                  </span>
+                                )}
+                              </div>
                               
                               <select
                                 value={mType}
@@ -1035,19 +1065,19 @@ export default function IntegrationCard({
 
                               {mType === 'field' ? (
                                 <select
-                                  required
+                                  required={isRequired}
                                   value={mappingValues[field] || ''}
                                   onChange={(e) => setMappingValues({ ...mappingValues, [field]: e.target.value })}
                                   style={{
                                     padding: '0.45rem 0.6rem',
                                     fontSize: '0.78rem',
                                     fontWeight: 600,
-                                    border: '1px solid #cbd5e1',
+                                    border: isRequired && !mappingValues[field] ? '1px solid #f87171' : '1px solid #cbd5e1',
                                     borderRadius: '8px',
                                     background: '#ffffff'
                                   }}
                                 >
-                                  <option value="">-- Seleccionar Variable --</option>
+                                  <option value="">{isRequired ? '-- Seleccionar Variable (Obligatorio) --' : '-- Sin asignar (Opcional) --'}</option>
                                   {availOutputs.map((out: string) => (
                                     <option key={out} value={out}>{out}</option>
                                   ))}
@@ -1055,14 +1085,14 @@ export default function IntegrationCard({
                               ) : (
                                 <input
                                   type="text"
-                                  required
-                                  placeholder="Escribe el valor fijo"
+                                  required={isRequired}
+                                  placeholder={isRequired ? "Escribe el valor fijo (Obligatorio)" : "Valor fijo (Opcional)"}
                                   value={mappingValues[field] || ''}
                                   onChange={(e) => setMappingValues({ ...mappingValues, [field]: e.target.value })}
                                   style={{
                                     padding: '0.45rem 0.6rem',
                                     fontSize: '0.78rem',
-                                    border: '1px solid #cbd5e1',
+                                    border: isRequired && !mappingValues[field] ? '1px solid #f87171' : '1px solid #cbd5e1',
                                     borderRadius: '8px',
                                     background: '#ffffff'
                                   }}
@@ -1157,9 +1187,19 @@ export default function IntegrationCard({
 
                         {/* Mappings preview without __templateId and with clean icons */}
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
-                          {Object.entries(rule.mappings)
-                            .filter(([k]) => k !== '__templateId')
-                            .map(([k, v]) => {
+                          {(() => {
+                            const validMappings = Object.entries(rule.mappings)
+                              .filter(([k, v]) => k !== '__templateId' && v !== '' && v !== undefined && v !== null);
+                            
+                            if (validMappings.length === 0) {
+                              return (
+                                <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                  (Sin variables adicionales configuradas)
+                                </span>
+                              );
+                            }
+
+                            return validMappings.map(([k, v]) => {
                               const isFld = rule.mappingTypes[k] === 'field';
                               return (
                                 <span key={k} style={{
@@ -1184,7 +1224,8 @@ export default function IntegrationCard({
                                   )}
                                 </span>
                               );
-                            })}
+                            });
+                          })()}
                         </div>
                       </div>
 

@@ -10,6 +10,7 @@ export interface AppConfig {
     name: string;
     description: string;
     fields: string[];
+    requiredFields?: string[];
   }[];
 }
 
@@ -213,32 +214,38 @@ export const ALL_APPS: Record<string, AppConfig> = {
       { 
         name: 'Crear Factura o Cotización', 
         description: 'POST /api/v1/invoices - Genera factura o cotización.', 
-        fields: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta', 'Notas'] 
+        fields: ['Nombre del Cliente', 'Email del Cliente', 'Monto Total', 'Concepto de Venta', 'Notas'],
+        requiredFields: ['Nombre del Cliente', 'Monto Total']
       },
       { 
         name: 'Actualizar Estado de Factura', 
         description: 'PUT /api/v1/invoices - Cambia estado de factura.', 
-        fields: ['ID de Factura', 'Nuevo Estado'] 
+        fields: ['ID de Factura', 'Nuevo Estado'],
+        requiredFields: ['ID de Factura', 'Nuevo Estado']
       },
       { 
         name: 'Crear o Actualizar Cliente', 
         description: 'POST /api/v1/clients - Registra un prospecto.', 
-        fields: ['Nombre del Cliente', 'Email del Cliente', 'Teléfono', 'RUC / Cédula', 'Notas'] 
+        fields: ['Nombre del Cliente', 'Email del Cliente', 'Teléfono', 'RUC / Cédula', 'Notas'],
+        requiredFields: ['Nombre del Cliente']
       },
       { 
         name: 'Añadir etiqueta a un cliente', 
         description: 'Segmenta clientes con etiquetas.', 
-        fields: ['Email del Cliente', 'Etiquetas'] 
+        fields: ['Email del Cliente', 'Etiquetas'],
+        requiredFields: ['Email del Cliente', 'Etiquetas']
       },
       { 
         name: 'Añadir nota interna a un cliente', 
         description: 'Registra una nota interna en la ficha del cliente.', 
-        fields: ['Email del Cliente', 'Notas'] 
+        fields: ['Email del Cliente', 'Notas'],
+        requiredFields: ['Email del Cliente', 'Notas']
       },
       { 
         name: 'Enviar recordatorio de pago al cliente (vía email)', 
         description: 'Envía correo de cobranza de factura vencida.', 
-        fields: ['ID de Factura'] 
+        fields: ['ID de Factura'],
+        requiredFields: ['ID de Factura']
       }
     ]
   },
@@ -283,17 +290,20 @@ export const ALL_APPS: Record<string, AppConfig> = {
           'Documento Adjunto (URL)',
           'Email de Miembro',
           'Fecha Límite'
-        ] 
+        ],
+        requiredFields: ['Título de Tarea']
       },
       { 
         name: 'Mover Tarjeta', 
         description: 'Desplaza una tarjeta a otra columna.', 
-        fields: ['ID de Tarea', 'Columna Destino'] 
+        fields: ['ID de Tarea', 'Columna Destino'],
+        requiredFields: ['ID de Tarea', 'Columna Destino']
       },
       { 
         name: 'Asignar Miembro', 
         description: 'Asigna una tarea a un correo de miembro.', 
-        fields: ['ID de Tarea', 'Email de Miembro'] 
+        fields: ['ID de Tarea', 'Email de Miembro'],
+        requiredFields: ['ID de Tarea', 'Email de Miembro']
       }
     ]
   },
@@ -428,37 +438,44 @@ export const ALL_APPS: Record<string, AppConfig> = {
       { 
         name: 'Crear o Actualizar Lead en CRM', 
         description: 'Inserta o sincroniza los datos de un prospecto en el CRM central de LeadsHUB.', 
-        fields: ['Nombre del Lead', 'Email del Lead', 'Teléfono del Lead', 'Estado de Embudo', 'Etiquetas (separadas por coma)', 'Notas / Historial', 'Puntaje de Scoring'] 
+        fields: ['Nombre del Lead', 'Email del Lead', 'Teléfono del Lead', 'Estado de Embudo', 'Etiquetas (separadas por coma)', 'Notas / Historial', 'Puntaje de Scoring'],
+        requiredFields: ['Nombre del Lead']
       },
       { 
         name: 'Enviar Mensaje Proactivo (WhatsApp / Canal)', 
         description: 'Envía un mensaje personalizado al cliente por WhatsApp o su canal activo mediante el agente de IA.', 
-        fields: ['Teléfono del Lead', 'Mensaje a Enviar', 'Documento Adjunto (URL / PDF)', 'Nombre del Lead'] 
+        fields: ['Teléfono del Lead', 'Mensaje a Enviar', 'Documento Adjunto (URL / PDF)', 'Nombre del Lead'],
+        requiredFields: ['Teléfono del Lead', 'Mensaje a Enviar']
       },
       { 
         name: 'Mover Lead de Estado de Embudo', 
         description: 'Actualiza la etapa o columna del pipeline Kanban para el prospecto.', 
-        fields: ['Teléfono o Email del Lead', 'Nuevo Estado de Embudo', 'Nota de Cambio de Estado'] 
+        fields: ['Teléfono o Email del Lead', 'Nuevo Estado de Embudo', 'Nota de Cambio de Estado'],
+        requiredFields: ['Teléfono o Email del Lead', 'Nuevo Estado de Embudo']
       },
       { 
         name: 'Añadir Etiquetas a Lead', 
         description: 'Asigna etiquetas de segmentación al contacto en el CRM (ej. Facturado, VIP).', 
-        fields: ['Teléfono o Email del Lead', 'Etiquetas a Añadir'] 
+        fields: ['Teléfono o Email del Lead', 'Etiquetas a Añadir'],
+        requiredFields: ['Teléfono o Email del Lead', 'Etiquetas a Añadir']
       },
       { 
         name: 'Agendar Cita en Calendario', 
         description: 'Crea un evento o reunión agendada vinculada al contacto y al agente.', 
-        fields: ['Teléfono o Email del Lead', 'Título de Cita', 'Fecha y Hora de Inicio', 'Duración en Minutos', 'Enlace de Reunión / Ubicación'] 
+        fields: ['Teléfono o Email del Lead', 'Título de Cita', 'Fecha y Hora de Inicio', 'Duración en Minutos', 'Enlace de Reunión / Ubicación'],
+        requiredFields: ['Teléfono o Email del Lead', 'Título de Cita', 'Fecha y Hora de Inicio']
       },
       { 
         name: 'Registrar Nota en Bitácora del Lead', 
         description: 'Agrega una nota en la línea de tiempo de actividades del contacto en LeadsHUB.', 
-        fields: ['Teléfono o Email del Lead', 'Contenido de la Nota / Actividad'] 
+        fields: ['Teléfono o Email del Lead', 'Contenido de la Nota / Actividad'],
+        requiredFields: ['Teléfono o Email del Lead', 'Contenido de la Nota / Actividad']
       },
       { 
         name: 'Asignar Asesor a Conversación', 
         description: 'Asigna el contacto y su chat a un asesor humano específico del equipo.', 
-        fields: ['Teléfono o Email del Lead', 'Email o Nombre del Asesor'] 
+        fields: ['Teléfono o Email del Lead', 'Email o Nombre del Asesor'],
+        requiredFields: ['Teléfono o Email del Lead', 'Email o Nombre del Asesor']
       }
     ]
   },
@@ -498,12 +515,14 @@ export const ALL_APPS: Record<string, AppConfig> = {
       { 
         name: 'Iniciar Análisis de Riesgo', 
         description: 'Dispara el motor de evaluación para un cliente.', 
-        fields: ['Nombre del Cliente', 'Email del Cliente', 'Teléfono', 'Monto Solicitado'] 
+        fields: ['Nombre del Cliente', 'Email del Cliente', 'Teléfono', 'Monto Solicitado'],
+        requiredFields: ['Nombre del Cliente', 'Monto Solicitado']
       },
       { 
         name: 'Aprobar Pre-Crédito', 
         description: 'Pre-aprueba la solicitud de crédito del cliente.', 
-        fields: ['ID de Solicitud', 'Monto Aprobado'] 
+        fields: ['ID de Solicitud', 'Monto Aprobado'],
+        requiredFields: ['ID de Solicitud', 'Monto Aprobado']
       }
     ]
   },
@@ -538,12 +557,14 @@ export const ALL_APPS: Record<string, AppConfig> = {
       { 
         name: 'Enviar Correo Transaccional', 
         description: 'Envía un email directo usando una plantilla.', 
-        fields: ['Email Destinatario', 'Asunto del Correo', 'Cuerpo del Correo', 'Documento Adjunto (URL)'] 
+        fields: ['Email Destinatario', 'Asunto del Correo', 'Cuerpo del Correo', 'Documento Adjunto (URL)'],
+        requiredFields: ['Email Destinatario', 'Asunto del Correo', 'Cuerpo del Correo']
       },
       { 
         name: 'Añadir a Lista de Envío', 
         description: 'Suscribe a un usuario a una campaña o newsletter.', 
-        fields: ['Email del Suscriptor', 'Nombre del Suscriptor', 'Lista'] 
+        fields: ['Email del Suscriptor', 'Nombre del Suscriptor', 'Lista'],
+        requiredFields: ['Email del Suscriptor', 'Lista']
       }
     ]
   }
