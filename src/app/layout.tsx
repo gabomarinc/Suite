@@ -57,7 +57,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      <body>
+      <body className={isAuth ? "app-body" : "landing-body"}>
         {isAuth ? (
           <>
             <Sidebar user={user} isLocked={isLocked} />
