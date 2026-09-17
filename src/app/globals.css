@@ -3094,4 +3094,37 @@ body.landing-body {
   font-size: 0.85rem;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   KÔNSUL IN-APP NOTIFICATIONS & DIALOGS
+   ═══════════════════════════════════════════════════════════════ */
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes toastProgress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.konsul-dialog-overlay {
+  animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.konsul-dialog-card {
+  animation: scaleUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+
 

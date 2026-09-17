@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   description: "Unified dashboard for all Konsul MicroSaaS applications",
 };
 
+import { DialogProvider } from "@/components/KonsulDialog";
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -58,14 +60,16 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className={isAuth ? "app-body" : "landing-body"}>
-        {isAuth ? (
-          <>
-            <Sidebar user={user} isLocked={isLocked} />
-            {children}
-          </>
-        ) : (
-          children
-        )}
+        <DialogProvider>
+          {isAuth ? (
+            <>
+              <Sidebar user={user} isLocked={isLocked} />
+              {children}
+            </>
+          ) : (
+            children
+          )}
+        </DialogProvider>
       </body>
     </html>
   );

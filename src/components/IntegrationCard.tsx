@@ -18,6 +18,7 @@ import {
   fetchAppStages
 } from '../app/automatizaciones/actions';
 import { ALL_APPS, APP_NAMES_MAP, type AppConfig } from '@/lib/appsConfig';
+import { useDialog } from '@/components/KonsulDialog';
 
 interface AppItem {
   code: string;
@@ -58,6 +59,7 @@ export default function IntegrationCard({
   userEmail = '',
   userName = '',
 }: IntegrationCardProps) {
+  const { showToast, showConfirm, showAlert } = useDialog();
   const [isActive, setIsActive] = useState(initialIsActive);
   const [serviceKey, setServiceKey] = useState(initialServiceKey);
   const [inputKey, setInputKey] = useState(initialServiceKey);
@@ -279,7 +281,14 @@ export default function IntegrationCard({
   };
 
   const handleDisconnectSso = async () => {
-    if (!confirm(`¿Estás seguro de que deseas desconectar ${app.name}?`)) return;
+    const confirmed = await showConfirm({
+      title: `Desconectar ${app.name}`,
+      message: `¿Estás seguro de que deseas desconectar ${app.name}? Las automatizaciones vinculadas a esta aplicación se pausarán.`,
+      confirmText: 'Desconectar',
+      variant: 'danger'
+    });
+    if (!confirmed) return;
+
     setIsDisconnecting(true);
     try {
       const res = await disconnectApp(app.code);
@@ -290,9 +299,19 @@ export default function IntegrationCard({
         setTestStatus('idle');
         setTestLog([]);
         window.dispatchEvent(new Event('konsul_integrations_updated'));
+        showToast({
+          type: 'info',
+          title: 'Aplicación Desconectada',
+          message: `${app.name} fue desconectada de tu Suite.`
+        });
       }
     } catch (err) {
       console.error('Error al desconectar:', err);
+      showToast({
+        type: 'error',
+        title: 'Error al desconectar',
+        message: 'Ocurrió un error al intentar desconectar la aplicación.'
+      });
     } finally {
       setIsDisconnecting(false);
     }
@@ -352,9 +371,18 @@ export default function IntegrationCard({
       setIsActive(!!trimmedKey);
       setTestStatus('success');
       window.dispatchEvent(new Event('konsul_integrations_updated'));
-      alert('Service Key guardado con éxito.');
+      showToast({
+        type: 'success',
+        title: 'Service Key Guardado',
+        message: `La clave de servicio para ${app.name} fue guardada exitosamente.`
+      });
     } catch (e) {
       console.error(e);
+      showToast({
+        type: 'error',
+        title: 'Error al guardar',
+        message: 'No se pudo guardar la clave de servicio.'
+      });
     } finally {
       setIsSaving(false);
     }
@@ -423,7 +451,12 @@ export default function IntegrationCard({
     });
 
     if (missingFields.length > 0) {
-      alert(`Por favor completa las siguientes variables indispensables:\n• ${missingFields.join('\n• ')}`);
+      showAlert({
+        type: 'warning',
+        title: 'Variables indispensables incompletas',
+        message: 'Para activar esta automatización, completa las siguientes variables requeridas:',
+        details: missingFields
+      });
       return;
     }
     
@@ -467,7 +500,11 @@ export default function IntegrationCard({
         setMappingTypes({});
         setCurrentStep(1);
         setActiveTab('rules');
-        alert('Regla de automatización actualizada con éxito.');
+        showToast({
+          type: 'success',
+          title: 'Regla Actualizada',
+          message: 'La automatización ha sido actualizada con éxito.'
+        });
       } else {
         const savedRule = await createAutomationRule({
           sourceApp: app.code,
@@ -487,11 +524,19 @@ export default function IntegrationCard({
         setMappingTypes({});
         setCurrentStep(1);
         setActiveTab('rules');
-        alert('Regla de automatización creada y activada con éxito.');
+        showToast({
+          type: 'success',
+          title: 'Automatización Activada',
+          message: 'La regla de automatización fue creada y activada con éxito.'
+        });
       }
     } catch (err) {
       console.error(err);
-      alert('Error al guardar la regla en la base de datos.');
+      showToast({
+        type: 'error',
+        title: 'Error al guardar',
+        message: 'No se pudo guardar la regla en la base de datos.'
+      });
     }
   };
 
@@ -535,37 +580,63 @@ export default function IntegrationCard({
             return `• ${targetField}: "${value}"`;
           });
 
-        const alertMessage = 
-          `✅ Regla de Automatización Probada con Éxito\n\n` +
-          `🔍 ${realRes.summary}\n` +
-          `⚡ Disparador: ${trigName}\n` +
-          `🎯 App Destino: ${targetAppName}\n\n` +
-          `Variables reales aplicadas a la acción:\n` +
-          (appliedLines.length > 0 ? appliedLines.join('\n') : '• Ejecución estándar sin variables') +
-          `\n\nRevisa el Historial (Logs) para ver la confirmación devuelta por ${targetAppName}.`;
-
-        alert(alertMessage);
+        showAlert({
+          type: 'success',
+          title: '¡Prueba ejecutada con éxito!',
+          message: realRes.summary || 'La automatización se probó y ejecutó correctamente.',
+          details: [
+            `Disparador: ${trigName}`,
+            `App Destino: ${targetAppName}`,
+            ...(appliedLines.length > 0 ? appliedLines : ['Ejecución estándar sin variables']),
+            `Revisa el Historial (Logs) para ver la confirmación devuelta por ${targetAppName}.`
+          ]
+        });
         window.dispatchEvent(new Event('konsul_rules_updated'));
       } else {
-        alert(`Fallo al ejecutar la prueba: ${resData.error || 'Error desconocido'}`);
+        showToast({
+          type: 'error',
+          title: 'Fallo al ejecutar prueba',
+          message: resData.error || 'Error desconocido al procesar la acción.'
+        });
       }
     } catch (err: any) {
       console.error(err);
-      alert(`Error al ejecutar prueba con datos reales: ${err.message || err}`);
+      showToast({
+        type: 'error',
+        title: 'Error de ejecución',
+        message: `Error al ejecutar prueba con datos reales: ${err.message || err}`
+      });
     } finally {
       setTestingRuleId(null);
     }
   };
 
   const handleDeleteRule = async (id: string) => {
+    const confirmed = await showConfirm({
+      title: 'Eliminar automatización',
+      message: '¿Estás seguro de que deseas eliminar esta regla de automatización? Esta acción no se puede deshacer.',
+      confirmText: 'Eliminar',
+      variant: 'danger'
+    });
+    if (!confirmed) return;
+
     try {
       await deleteAutomationRule(id);
       const updated = rules.filter(r => r.id !== id);
       setRules(updated);
       window.dispatchEvent(new Event('konsul_rules_updated'));
+      showToast({
+        type: 'success',
+        title: 'Automatización eliminada',
+        message: 'La regla fue eliminada exitosamente.'
+      });
     } catch (err) {
       console.error(err);
-      alert('Error al borrar la regla.');
+      showToast({
+        type: 'error',
+        title: 'Error al borrar',
+        message: 'No se pudo borrar la regla de automatización.'
+      });
     }
   };
 
@@ -580,7 +651,11 @@ export default function IntegrationCard({
       window.dispatchEvent(new Event('konsul_rules_updated'));
     } catch (err) {
       console.error(err);
-      alert('Error al cambiar el estado de la regla.');
+      showToast({
+        type: 'error',
+        title: 'Error al actualizar',
+        message: 'No se pudo cambiar el estado de la regla de automatización.'
+      });
     }
   };
 

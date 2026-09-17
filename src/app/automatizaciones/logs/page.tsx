@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getAutomationLogs, retryAutomationLog } from '../actions';
 import { ALL_APPS, APP_NAMES_MAP } from '@/lib/appsConfig';
+import { useDialog } from '@/components/KonsulDialog';
 
 interface AutomationLog {
   id: string;
@@ -25,6 +26,7 @@ export default function AutomationLogsPage() {
   const [selectedLog, setSelectedLog] = useState<AutomationLog | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [retryingIds, setRetryingIds] = useState<Record<string, boolean>>({});
+  const { showToast, showConfirm, showAlert } = useDialog();
 
   const fetchLogs = async () => {
     try {
@@ -45,18 +47,30 @@ export default function AutomationLogsPage() {
     try {
       const result = await retryAutomationLog(logId);
       if (result.success) {
-        alert("¡Re-intento exitoso! Se ha registrado una nueva ejecución en el historial.");
+        showToast({
+          type: 'success',
+          title: '¡Re-intento exitoso!',
+          message: 'Se ha registrado una nueva ejecución en el historial.'
+        });
         await fetchLogs();
         if (selectedLog && selectedLog.id === logId) {
           setSelectedLog(null); // Close the inspector
         }
       } else {
-        alert(`Fallo en el re-intento: ${result.error}`);
+        showToast({
+          type: 'error',
+          title: 'Fallo en el re-intento',
+          message: result.error || 'La ejecución de re-intento falló.'
+        });
         await fetchLogs();
       }
     } catch (err: any) {
       console.error(err);
-      alert(`Error al re-ejecutar: ${err.message || err}`);
+      showToast({
+        type: 'error',
+        title: 'Error al re-ejecutar',
+        message: err.message || String(err)
+      });
     } finally {
       setRetryingIds(prev => ({ ...prev, [logId]: false }));
     }
@@ -65,10 +79,22 @@ export default function AutomationLogsPage() {
   const handleRetryAllFailed = async () => {
     const failedLogs = logs.filter(l => l.status === 'FAILED');
     if (failedLogs.length === 0) {
-      alert("No hay ejecuciones fallidas en el historial para re-intentar.");
+      showToast({
+        type: 'info',
+        title: 'Sin fallos pendientes',
+        message: 'No hay ejecuciones fallidas en el historial para re-intentar.'
+      });
       return;
     }
-    if (!confirm(`¿Estás seguro de que deseas re-intentar las ${failedLogs.length} ejecuciones fallidas?`)) {
+
+    const confirmed = await showConfirm({
+      title: 'Re-intentar ejecuciones fallidas',
+      message: `¿Estás seguro de que deseas re-intentar las ${failedLogs.length} ejecuciones fallidas del historial?`,
+      confirmText: `Re-intentar (${failedLogs.length})`,
+      variant: 'primary'
+    });
+
+    if (!confirmed) {
       return;
     }
     
@@ -89,7 +115,16 @@ export default function AutomationLogsPage() {
       }
     }
     
-    alert(`Proceso completado. Éxitos: ${successCount}, Fallidos: ${failCount}`);
+    showAlert({
+      type: failCount === 0 ? 'success' : 'warning',
+      title: 'Re-intento masivo completado',
+      message: 'El proceso de re-intento ha finalizado con los siguientes resultados:',
+      details: [
+        `Ejecuciones exitosas: ${successCount}`,
+        `Ejecuciones fallidas: ${failCount}`,
+        'El historial ha sido actualizado automáticamente.'
+      ]
+    });
     await fetchLogs();
   };
 

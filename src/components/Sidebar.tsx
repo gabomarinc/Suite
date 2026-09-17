@@ -5,6 +5,7 @@ import { LogoutLink } from "@kinde-oss/kinde-auth-nextjs/components";
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { sendSupportRequest } from '@/app/actions/support';
+import { konsulToast } from '@/components/KonsulDialog';
 
 interface SidebarProps {
   user: {
@@ -41,7 +42,7 @@ export default function Sidebar({ user, isLocked = false }: SidebarProps) {
       setSupportSuccess(true);
     } catch (err) {
       console.error('Error enviando soporte:', err);
-      alert('Error al enviar la solicitud de ayuda.');
+      konsulToast.error('No se pudo enviar la solicitud de ayuda. Por favor inténtalo de nuevo.', 'Error de Soporte');
     } finally {
       setIsSubmittingSupport(false);
     }
