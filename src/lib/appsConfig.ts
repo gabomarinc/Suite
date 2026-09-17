@@ -331,7 +331,7 @@ export const ALL_APPS: Record<string, AppConfig> = {
       },
       { 
         name: 'Estado de Prospecto Cambiado (Embudo Kanban)', 
-        description: 'Se dispara cuando un prospecto cambia de columna en el embudo Kanban. [contact:status_changed]', 
+        description: 'Se dispara cuando un prospecto cambia de columna en el CRM (Embudo Kanban) o cambia el estado de su conversación de chat. [contact:status_changed]', 
         outputs: [
           'ID del Lead',
           'Nombre del Lead', 
@@ -340,6 +340,7 @@ export const ALL_APPS: Record<string, AppConfig> = {
           'Teléfono del Lead',
           'Estado Anterior',
           'Nuevo Estado de Embudo',
+          'Estado de Chat',
           'Puntaje de Scoring',
           'Asesor Asignado',
           'Resumen de IA',

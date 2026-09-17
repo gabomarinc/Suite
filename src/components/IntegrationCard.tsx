@@ -110,6 +110,7 @@ export default function IntegrationCard({
 
   // Pipeline / Board Stages State (dynamically fetched from source app)
   const [availableStages, setAvailableStages] = useState<string[]>([]);
+  const [groupedStages, setGroupedStages] = useState<{ crm?: string[]; chat?: string[] }>({});
   const [isLoadingStages, setIsLoadingStages] = useState(false);
 
   useEffect(() => {
@@ -117,9 +118,15 @@ export default function IntegrationCard({
     const loadStages = async () => {
       setIsLoadingStages(true);
       try {
-        const stages = await fetchAppStages(app.code);
+        const res = await fetchAppStages(app.code);
         if (isMounted) {
-          setAvailableStages(stages);
+          if (Array.isArray(res)) {
+            setAvailableStages(res);
+            setGroupedStages({});
+          } else if (res && typeof res === 'object') {
+            setAvailableStages(res.stages || []);
+            setGroupedStages({ crm: res.crm, chat: res.chat });
+          }
         }
       } catch (err) {
         console.error('Error fetching stages for app:', app.code, err);
@@ -1057,9 +1064,26 @@ export default function IntegrationCard({
                                   }}
                                 >
                                   <option value="">-- Seleccionar de la lista --</option>
-                                  {availableStages.map(st => (
-                                    <option key={st} value={st}>{st}</option>
-                                  ))}
+                                  {groupedStages.crm && groupedStages.crm.length > 0 ? (
+                                    <>
+                                      <optgroup label="📊 Estados del CRM (Embudo Kanban)">
+                                        {groupedStages.crm.map(st => (
+                                          <option key={st} value={st}>{st}</option>
+                                        ))}
+                                      </optgroup>
+                                      {groupedStages.chat && groupedStages.chat.length > 0 && (
+                                        <optgroup label="💬 Estados del Chatbot (Conversaciones)">
+                                          {groupedStages.chat.map(st => (
+                                            <option key={st} value={st}>{st}</option>
+                                          ))}
+                                        </optgroup>
+                                      )}
+                                    </>
+                                  ) : (
+                                    availableStages.map(st => (
+                                      <option key={st} value={st}>{st}</option>
+                                    ))
+                                  )}
                                 </select>
                               )}
                               <datalist id="available-stages-list">
@@ -1069,32 +1093,106 @@ export default function IntegrationCard({
                               </datalist>
                             </div>
 
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.45rem', alignItems: 'center' }}>
-                              <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
-                                {isLoadingStages ? `Cargando estados reales de ${app.name}...` : `Columnas / Estados reales de ${app.name}:`}
-                              </span>
-                              {availableStages.map(sug => (
-                                <button
-                                  key={sug}
-                                  type="button"
-                                  onClick={() => setFilterStatus(sug)}
-                                  style={{
-                                    fontSize: '11px',
-                                    fontWeight: 700,
-                                    padding: '3px 9px',
-                                    borderRadius: '6px',
-                                    background: filterStatus.toLowerCase() === sug.toLowerCase() ? '#00a884' : '#ffffff',
-                                    color: filterStatus.toLowerCase() === sug.toLowerCase() ? '#ffffff' : '#334155',
-                                    border: filterStatus.toLowerCase() === sug.toLowerCase() ? '1.5px solid #00a884' : '1px solid #cbd5e1',
-                                    cursor: 'pointer',
-                                    boxShadow: filterStatus.toLowerCase() === sug.toLowerCase() ? '0 2px 6px rgba(0, 168, 132, 0.25)' : 'none'
-                                  }}
-                                >
-                                  {sug}
-                                </button>
-                              ))}
-                            </div>
+                            {/* Grouped pills or single pill list */}
+                            {groupedStages.crm && groupedStages.crm.length > 0 ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginTop: '0.65rem' }}>
+                                <div>
+                                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#0f766e', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+                                    <span>Estados del CRM (Embudo Kanban):</span>
+                                  </div>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                                    {groupedStages.crm.map(sug => {
+                                      const isSelected = filterStatus.trim().toLowerCase() === sug.trim().toLowerCase();
+                                      return (
+                                        <button
+                                          key={sug}
+                                          type="button"
+                                          onClick={() => setFilterStatus(sug)}
+                                          style={{
+                                            fontSize: '11px',
+                                            fontWeight: 700,
+                                            padding: '4px 10px',
+                                            borderRadius: '6px',
+                                            background: isSelected ? '#00a884' : '#f8fafc',
+                                            color: isSelected ? '#ffffff' : '#334155',
+                                            border: isSelected ? '1.5px solid #00a884' : '1px solid #cbd5e1',
+                                            cursor: 'pointer',
+                                            boxShadow: isSelected ? '0 2px 6px rgba(0, 168, 132, 0.25)' : 'none',
+                                            transition: 'all 0.15s ease'
+                                          }}
+                                        >
+                                          {sug}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                {groupedStages.chat && groupedStages.chat.length > 0 && (
+                                  <div>
+                                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#2563eb', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                      <span>Estados del Chatbot (Conversaciones):</span>
+                                    </div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                                      {groupedStages.chat.map(sug => {
+                                        const isSelected = filterStatus.trim().toLowerCase() === sug.trim().toLowerCase()
+                                          || (sug.includes('(') && filterStatus.trim().toLowerCase() === sug.split('(')[0].trim().toLowerCase());
+                                        return (
+                                          <button
+                                            key={sug}
+                                            type="button"
+                                            onClick={() => setFilterStatus(sug)}
+                                            style={{
+                                              fontSize: '11px',
+                                              fontWeight: 700,
+                                              padding: '4px 10px',
+                                              borderRadius: '6px',
+                                              background: isSelected ? '#2563eb' : '#eff6ff',
+                                              color: isSelected ? '#ffffff' : '#1e40af',
+                                              border: isSelected ? '1.5px solid #2563eb' : '1px solid #bfdbfe',
+                                              cursor: 'pointer',
+                                              boxShadow: isSelected ? '0 2px 6px rgba(37, 99, 235, 0.25)' : 'none',
+                                              transition: 'all 0.15s ease'
+                                            }}
+                                          >
+                                            {sug}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.45rem', alignItems: 'center' }}>
+                                <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+                                  {isLoadingStages ? `Cargando estados reales de ${app.name}...` : `Columnas / Estados reales de ${app.name}:`}
+                                </span>
+                                {availableStages.map(sug => (
+                                  <button
+                                    key={sug}
+                                    type="button"
+                                    onClick={() => setFilterStatus(sug)}
+                                    style={{
+                                      fontSize: '11px',
+                                      fontWeight: 700,
+                                      padding: '3px 9px',
+                                      borderRadius: '6px',
+                                      background: filterStatus.toLowerCase() === sug.toLowerCase() ? '#00a884' : '#ffffff',
+                                      color: filterStatus.toLowerCase() === sug.toLowerCase() ? '#ffffff' : '#334155',
+                                      border: filterStatus.toLowerCase() === sug.toLowerCase() ? '1.5px solid #00a884' : '1px solid #cbd5e1',
+                                      cursor: 'pointer',
+                                      boxShadow: filterStatus.toLowerCase() === sug.toLowerCase() ? '0 2px 6px rgba(0, 168, 132, 0.25)' : 'none'
+                                    }}
+                                  >
+                                    {sug}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

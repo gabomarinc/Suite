@@ -84,8 +84,24 @@ export async function POST(req: Request) {
           'Fecha de Registro': rawBody.timestamp || contact.createdAt || new Date().toISOString(),
           ...rawData
         };
-      } else if (event === 'contact:status_changed' || event === 'lead.status_changed' || event.toLowerCase().includes('status_changed') || event.toLowerCase().includes('calificado') || event.toLowerCase().includes('embudo kanban')) {
+      } else if (
+        event === 'contact:status_changed' || 
+        event === 'lead.status_changed' || 
+        event === 'conversation:closed' || 
+        event === 'conversation:handoff_requested' || 
+        event.toLowerCase().includes('status_changed') || 
+        event.toLowerCase().includes('calificado') || 
+        event.toLowerCase().includes('embudo kanban') || 
+        event.toLowerCase().includes('conversation:closed') || 
+        event.toLowerCase().includes('conversation:handoff')
+      ) {
         triggerName = 'Estado de Prospecto Cambiado (Embudo Kanban)';
+        const chatStatus = event === 'conversation:closed' 
+          ? 'Cerrado (CLOSED)' 
+          : event === 'conversation:handoff_requested' 
+          ? 'Transferido a Asesor' 
+          : (rawData.status || contact.status || '');
+        const effectiveNewStatus = rawData.newStatus || contact.prospectStatus || chatStatus || '';
         data = {
           'ID del Lead': contact.id || contact.contactId || '',
           'Nombre del Lead': contact.name || contact.contactName || '',
@@ -94,7 +110,9 @@ export async function POST(req: Request) {
           'Email del Lead': contact.email || contact.contactEmail || '',
           'Teléfono del Lead': contact.phone || contact.contactPhone || '',
           'Estado Anterior': rawData.prevStatus || '',
-          'Nuevo Estado de Embudo': rawData.newStatus || contact.prospectStatus || '',
+          'Nuevo Estado de Embudo': effectiveNewStatus,
+          'Nuevo Estado': effectiveNewStatus,
+          'Estado de Chat': chatStatus,
           'Puntaje de Scoring': String(contact.leadScore || contact.score || ''),
           'Asesor Asignado': contact.assignedTo || rawData.assignedTo || '',
           'Resumen de IA': contact.summary || '',
@@ -305,6 +323,10 @@ export async function POST(req: Request) {
           data['prospectStatus'] || 
           data['Nuevo Estado'] || 
           data['Columna Actual'] || 
+          data['conversation']?.status ||
+          data['conversationStatus'] ||
+          data['chatStatus'] ||
+          data['Estado de Chat'] ||
           data['status'] || 
           ''
         ).toString().trim();
@@ -312,7 +334,18 @@ export async function POST(req: Request) {
         const normIncoming = rawIncoming.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const normTarget = filterStatus.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-        if (normIncoming !== normTarget && !normIncoming.includes(normTarget) && !normTarget.includes(normIncoming)) {
+        const cleanTarget = normTarget.replace(/\(.*?\)/g, '').trim();
+        const codeInTarget = (normTarget.match(/\((.*?)\)/)?.[1] || '').trim();
+
+        const isMatch = normIncoming === normTarget 
+          || (cleanTarget !== '' && normIncoming === cleanTarget)
+          || (codeInTarget !== '' && normIncoming === codeInTarget)
+          || (cleanTarget !== '' && normIncoming.includes(cleanTarget))
+          || (codeInTarget !== '' && normIncoming.includes(codeInTarget))
+          || (normIncoming !== '' && cleanTarget.includes(normIncoming))
+          || (normIncoming !== '' && normTarget.includes(normIncoming));
+
+        if (!isMatch) {
           // Status condition not met
           console.log(`[Rule ${rule.id}] Skipped: status filter '${filterStatus}' did not match incoming status '${rawIncoming}'`);
           continue;

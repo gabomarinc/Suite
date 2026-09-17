@@ -875,54 +875,123 @@ export async function deleteAutomationRule(id: string) {
   revalidatePath('/automatizaciones');
 }
 
-export async function fetchAppStages(appCode: string): Promise<string[]> {
+export interface GroupedStagesResult {
+  stages: string[];
+  crm?: string[];
+  chat?: string[];
+}
+
+export async function fetchAppStages(appCode: string): Promise<GroupedStagesResult> {
   if (appCode === 'leadshub') {
     const { isAuthenticated, getUser } = getKindeServerSession();
     const isAuth = await isAuthenticated();
     const user = isAuth ? await getUser() : null;
 
-    const leadshubUrl = process.env.NEXT_PUBLIC_LEADSHUB_URL || 'https://leadshub.konsul.digital';
-    const sharedSecret = process.env.KONSUL_ECOSYSTEM_SECRET_KEY || 'konsul_ecosystem_secret_2026';
+    const leadshubUrl = process.env.LEADSHUB_URL 
+      || process.env.NEXT_PUBLIC_LEADSHUB_URL 
+      || 'https://agentes.konsul.digital';
 
-    try {
-      const res = await fetch(`${leadshubUrl}/api/v1/contacts/status`, {
-        method: 'GET',
-        headers: {
-          'x-api-key': sharedSecret,
-          ...(user?.email ? { 'x-user-email': user.email } : {}),
-          'x-source-app': 'suite'
-        },
-        cache: 'no-store'
-      });
+    let crmStages: string[] = [];
 
-      if (res.ok) {
-        const json = await res.json();
-        const cols = json.data || json;
-        if (Array.isArray(cols) && cols.length > 0) {
-          return cols.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
+    if (user?.id) {
+      try {
+        const integration = await prisma.integration.findFirst({
+          where: {
+            userId: user.id,
+            appCode: 'leadshub',
+            isActive: true
+          }
+        });
+
+        const sharedSecret = process.env.KONSUL_ECOSYSTEM_SECRET_KEY || process.env.INTERNAL_API_KEY || 'konsul_ecosystem_secret_key';
+        const serviceKey = integration?.serviceKey || sharedSecret;
+        const isLhKey = serviceKey.startsWith('lh_live_');
+
+        const authHeaders: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'x-api-key': isLhKey ? serviceKey : sharedSecret,
+          'x-user-id': user.id,
+          'x-user-email': user.email || '',
+          'x-source-app': 'suite',
+          ...((serviceKey && !isLhKey && serviceKey !== sharedSecret) ? { 'x-workspace-id': serviceKey } : {})
+        };
+
+        const res = await fetch(`${leadshubUrl}/api/v1/contacts/status`, {
+          method: 'GET',
+          headers: authHeaders,
+          cache: 'no-store'
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          const cols = json.data || json;
+          if (Array.isArray(cols) && cols.length > 0) {
+            crmStages = cols.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
+          }
         }
+      } catch (err) {
+        console.warn('[fetchAppStages leadshub error]', err);
       }
-    } catch (err) {
-      console.warn('[fetchAppStages leadshub error]', err);
     }
 
-    // Default real Kanban columns in LeadsHUB
-    return ['Nuevo', 'Asignado', 'Finalizado'];
+    // Default real CRM pipeline stages if workspace has no custom columns configured yet
+    if (crmStages.length === 0) {
+      crmStages = [
+        'Nuevo',
+        'Contactado',
+        'Calificado',
+        'Propuesta Enviada',
+        'En Negociación',
+        'Ganado',
+        'Perdido',
+        'Asignado',
+        'Finalizado'
+      ];
+    }
+
+    // Standard Chatbot / Conversation statuses
+    const chatStages = [
+      'Abierto (OPEN)',
+      'Pendiente (PENDING)',
+      'Cerrado (CLOSED)',
+      'Bot Activo',
+      'Transferido a Asesor'
+    ];
+
+    const allStages = Array.from(new Set([...crmStages, ...chatStages]));
+
+    return {
+      stages: allStages,
+      crm: crmStages,
+      chat: chatStages
+    };
   }
 
   if (appCode === 'bills') {
-    return ['Borrador', 'Enviada', 'Seguimiento', 'Pagada', 'Abonada', 'Incobrable', 'Cancelada'];
+    const billsStages = ['Borrador', 'Enviada', 'Seguimiento', 'Pagada', 'Abonada', 'Incobrable', 'Cancelada'];
+    return {
+      stages: billsStages,
+      crm: billsStages
+    };
   }
 
   if (appCode === 'process') {
-    return ['Por Hacer', 'En Proceso', 'En Revisión', 'Completado', 'Bloqueado'];
+    const processStages = ['Por Hacer', 'En Proceso', 'En Revisión', 'Completado', 'Bloqueado'];
+    return {
+      stages: processStages,
+      crm: processStages
+    };
   }
 
   if (appCode === 'kredit') {
-    return ['Pendiente', 'En Revisión', 'Aprobado', 'Rechazado'];
+    const kreditStages = ['Pendiente', 'En Revisión', 'Aprobado', 'Rechazado'];
+    return {
+      stages: kreditStages,
+      crm: kreditStages
+    };
   }
 
-  return [];
+  return { stages: [] };
 }
 
 export async function toggleAutomationRule(id: string, currentStatus: boolean) {
@@ -1007,7 +1076,7 @@ export async function getConnectedIntegrations() {
   const integrations = await prisma.integration.findMany({
     where: { userId: user.id }
   });
-  return integrations.map(i => ({
+  return integrations.map((i: any) => ({
     appCode: i.appCode,
     serviceKey: i.serviceKey,
     isActive: i.isActive
