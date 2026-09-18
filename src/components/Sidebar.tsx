@@ -21,6 +21,10 @@ export default function Sidebar({ user, isLocked = false }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
 
+  if (pathname === '/pricing') {
+    return null;
+  }
+
   // Support Modal State
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [supportCategory, setSupportCategory] = useState('Consulta General');
