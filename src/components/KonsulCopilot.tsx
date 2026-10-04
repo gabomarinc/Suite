@@ -439,6 +439,37 @@ export default function KonsulCopilot({ user, connectedApps = [] }: KonsulCopilo
               </div>
             )}
 
+            {/* Conversational Confirmation Chips when Copilot asks to proceed */}
+            {(() => {
+              const lastMsg = messages[messages.length - 1];
+              const isAwaitingConfirmation = lastMsg?.role === 'model' && (
+                lastMsg.text.includes('¿Te parece bien') || 
+                lastMsg.text.includes('proceder') ||
+                lastMsg.text.includes('¿procedemos')
+              );
+
+              if (isAwaitingConfirmation && !isLoading) {
+                return (
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                    <button
+                      className="konsul-chip-btn"
+                      style={{ background: '#059669', borderColor: '#10B981', color: '#FFFFFF', fontWeight: 700 }}
+                      onClick={() => handleSendMessage('Sí, procede con la creación')}
+                    >
+                      <span>👍 Sí, procede y genera la tarjeta</span>
+                    </button>
+                    <button
+                      className="konsul-chip-btn"
+                      onClick={() => handleSendMessage('Quiero ajustar algunos detalles antes')}
+                    >
+                      <span>✏️ Ajustar detalles</span>
+                    </button>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             <div ref={messagesEndRef} />
           </div>
 
