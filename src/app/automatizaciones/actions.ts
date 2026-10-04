@@ -1016,19 +1016,27 @@ export async function toggleAutomationRule(id: string, currentStatus: boolean) {
   revalidatePath('/automatizaciones');
 }
 
-export async function fetchProcessTemplates(serviceKey: string) {
-  const { isAuthenticated } = getKindeServerSession();
+export async function fetchProcessTemplates(serviceKey: string, userEmail?: string | null, userId?: string | null) {
+  const { isAuthenticated, getUser } = getKindeServerSession();
   const isAuth = await isAuthenticated();
   if (!isAuth) throw new Error("No autenticado");
 
+  const sessionUser = await getUser().catch(() => null);
+  const emailToSend = userEmail || sessionUser?.email || '';
+  const idToSend = userId || sessionUser?.id || '';
+
   try {
+    const headers: Record<string, string> = {
+      'x-api-key': serviceKey || 'konsul_sso_process',
+      'Content-Type': 'application/json'
+    };
+    if (emailToSend) headers['x-user-email'] = emailToSend;
+    if (idToSend) headers['x-user-id'] = idToSend;
+
     const res = await fetch('https://process.konsul.digital/api/v1/templates', {
       method: 'GET',
       cache: 'no-store',
-      headers: {
-        'x-api-key': serviceKey,
-        'Content-Type': 'application/json'
-      }
+      headers
     });
 
     if (!res.ok) {
