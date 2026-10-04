@@ -1,0 +1,564 @@
+/* ============================================================================
+   KÔNSUL COPILOT - DESIGN SYSTEM OBSIDIAN & PILL BUBBLE
+   ============================================================================ */
+
+/* Floating Trigger Pill matching exactly the user-provided reference image */
+.konsul-copilot-trigger-pill {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: linear-gradient(135deg, #0b131e 0%, #152233 100%);
+  color: #FFFFFF;
+  border: 1.5px solid rgba(39, 190, 165, 0.45);
+  box-shadow: 0 12px 32px -4px rgba(11, 19, 30, 0.5), 0 0 24px rgba(39, 190, 165, 0.25);
+  border-radius: 9999px;
+  padding: 0.65rem 1.35rem 0.65rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.konsul-copilot-trigger-pill:hover {
+  transform: translateY(-3px) scale(1.02);
+  border-color: #27bea5;
+  box-shadow: 0 16px 36px -4px rgba(11, 19, 30, 0.6), 0 0 32px rgba(39, 190, 165, 0.4);
+}
+
+.konsul-trigger-avatar-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(39, 190, 165, 0.15);
+  border: 1.5px solid #209d8f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.konsul-trigger-text {
+  color: #FFFFFF;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.konsul-trigger-status-pulse {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  margin-left: 0.25rem;
+}
+
+.konsul-pulse-dot {
+  width: 9px;
+  height: 9px;
+  background-color: #10B981;
+  border-radius: 50%;
+  position: relative;
+  box-shadow: 0 0 8px #10B981;
+}
+
+.konsul-pulse-ring {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #10B981;
+  animation: konsulPulseAnim 2s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+}
+
+@keyframes konsulPulseAnim {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* ============================================================================
+   COPILOT SLIDE-OVER WINDOW (Dark Obsidian Theme)
+   ============================================================================ */
+
+.konsul-copilot-window {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 440px;
+  max-width: calc(100vw - 2rem);
+  height: 650px;
+  max-height: calc(100vh - 4rem);
+  background: #0B131E;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(39, 190, 165, 0.25);
+  display: flex;
+  flex-direction: column;
+  z-index: 10000;
+  overflow: hidden;
+  font-family: inherit;
+  animation: copilotSlideUpAnim 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes copilotSlideUpAnim {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Window Header */
+.konsul-copilot-header {
+  padding: 1rem 1.25rem;
+  background: #070D15;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.konsul-header-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.konsul-header-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(39, 190, 165, 0.2);
+  border: 1.5px solid #27BEA5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.konsul-header-titles h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.konsul-mcp-badge {
+  font-size: 0.65rem;
+  background: rgba(39, 190, 165, 0.2);
+  color: #27BEA5;
+  border: 1px solid rgba(39, 190, 165, 0.4);
+  padding: 0.1rem 0.45rem;
+  border-radius: 9999px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.konsul-header-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: #94A3B8;
+  margin-top: 0.15rem;
+}
+
+.konsul-status-dot-sm {
+  width: 6px;
+  height: 6px;
+  background-color: #10B981;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #10B981;
+}
+
+.konsul-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.konsul-header-btn {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  padding: 0.4rem;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.konsul-header-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFFFFF;
+}
+
+/* Context Ribbon */
+.konsul-context-ribbon {
+  background: rgba(15, 23, 42, 0.8);
+  padding: 0.45rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #94A3B8;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.konsul-ribbon-tag {
+  background: rgba(39, 190, 165, 0.15);
+  color: #27BEA5;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.7rem;
+}
+
+/* Messages Area */
+.konsul-copilot-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background: #0B131E;
+}
+
+.konsul-msg-row {
+  display: flex;
+  gap: 0.65rem;
+  max-width: 100%;
+}
+
+.konsul-msg-row.user {
+  flex-direction: row-reverse;
+}
+
+.konsul-msg-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+}
+
+.konsul-msg-avatar.model {
+  background: rgba(39, 190, 165, 0.2);
+  border: 1px solid #27BEA5;
+  color: #27BEA5;
+}
+
+.konsul-msg-avatar.user {
+  background: #3B82F6;
+  color: #FFFFFF;
+}
+
+.konsul-msg-bubble {
+  max-width: 82%;
+  padding: 0.75rem 1rem;
+  border-radius: 16px;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.konsul-msg-row.model .konsul-msg-bubble {
+  background: #141F2D;
+  color: #E2E8F0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top-left-radius: 4px;
+}
+
+.konsul-msg-row.user .konsul-msg-bubble {
+  background: #1D4ED8;
+  color: #FFFFFF;
+  border-top-right-radius: 4px;
+}
+
+/* Typing Indicator */
+.konsul-typing-box {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.6rem;
+}
+
+.konsul-typing-dot {
+  width: 6px;
+  height: 6px;
+  background: #27BEA5;
+  border-radius: 50%;
+  animation: typingBounceAnim 1.4s infinite ease-in-out both;
+}
+
+.konsul-typing-dot:nth-child(1) { animation-delay: -0.32s; }
+.konsul-typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes typingBounceAnim {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+/* Quick Action Chips */
+.konsul-chips-section {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.konsul-chips-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94A3B8;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.konsul-chips-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.konsul-chip-btn {
+  background: #152233;
+  border: 1px solid rgba(39, 190, 165, 0.25);
+  color: #E2E8F0;
+  padding: 0.45rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+.konsul-chip-btn:hover {
+  background: #1E2E44;
+  border-color: #27BEA5;
+  transform: translateX(2px);
+}
+
+/* ============================================================================
+   GENERATIVE UI: INTERACTIVE AUTOMATION CARD (Pilar 6)
+   ============================================================================ */
+
+.konsul-gen-card {
+  margin-top: 0.75rem;
+  background: #070D15;
+  border: 1.5px solid #27BEA5;
+  border-radius: 14px;
+  padding: 0.95rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+.konsul-gen-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.konsul-gen-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #27BEA5;
+  background: rgba(39, 190, 165, 0.15);
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.konsul-gen-apps-flow {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.konsul-gen-row {
+  margin-bottom: 0.5rem;
+  font-size: 0.78rem;
+  color: #94A3B8;
+}
+
+.konsul-gen-row strong {
+  color: #FFFFFF;
+}
+
+.konsul-gen-guardrail-banner {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10B981;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  margin: 0.65rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.konsul-gen-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.konsul-btn-dryrun {
+  flex: 1;
+  background: #1E293B;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #F8FAFC;
+  padding: 0.5rem;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  transition: all 0.2s;
+}
+
+.konsul-btn-dryrun:hover {
+  background: #334155;
+  border-color: #94A3B8;
+}
+
+.konsul-btn-activate {
+  flex: 1.2;
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  border: none;
+  color: #FFFFFF;
+  padding: 0.5rem;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  transition: all 0.2s;
+}
+
+.konsul-btn-activate:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+}
+
+.konsul-btn-activate:disabled,
+.konsul-btn-dryrun:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Simulation Result Box */
+.konsul-simulation-box {
+  margin-top: 0.65rem;
+  padding: 0.55rem;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(39, 190, 165, 0.3);
+  border-radius: 8px;
+  font-size: 0.72rem;
+  color: #CBD5E1;
+}
+
+.konsul-simulation-title {
+  color: #27BEA5;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* Footer Input Form */
+.konsul-copilot-footer {
+  padding: 0.85rem 1.25rem;
+  background: #070D15;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.konsul-chat-input-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #141F2D;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 0.35rem 0.5rem 0.35rem 0.85rem;
+  transition: all 0.2s;
+}
+
+.konsul-chat-input-form:focus-within {
+  border-color: #27BEA5;
+  box-shadow: 0 0 0 2px rgba(39, 190, 165, 0.2);
+}
+
+.konsul-chat-input-field {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #FFFFFF;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.konsul-chat-input-field::placeholder {
+  color: #64748B;
+}
+
+.konsul-chat-send-btn {
+  background: #27BEA5;
+  color: #070D15;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.konsul-chat-send-btn:hover:not(:disabled) {
+  background: #34d399;
+  transform: scale(1.05);
+}
+
+.konsul-chat-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

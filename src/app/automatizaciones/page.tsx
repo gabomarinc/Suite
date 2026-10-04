@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import IntegrationCard from "@/components/IntegrationCard";
+import KonsulCopilot from "@/components/KonsulCopilot";
 
 export default async function AutomatizacionesPage() {
   const { isAuthenticated, getUser } = getKindeServerSession();
@@ -239,6 +240,15 @@ export default async function AutomatizacionesPage() {
         })}
       </div>
 
+      {/* Kônsul Copilot Agéntico flotante (Pilar 4 y 6) */}
+      <KonsulCopilot
+        user={{
+          id: kindeUser.id,
+          name: kindeUser.given_name || (kindeUser as any).name || 'Colega',
+          email: kindeUser.email || ''
+        }}
+        connectedApps={connectedApps.map(a => a.code)}
+      />
     </main>
   );
 }

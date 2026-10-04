@@ -37,6 +37,39 @@ export async function POST(req: Request) {
     let userId = rawBody.userId || headers.get('x-user-id') || '';
     let data = rawBody.data || {};
 
+    const incomingDepth = parseInt(headers.get('x-konsul-depth') || String(rawBody.__depth || '0'), 10);
+    const isDryRun = (headers.get('x-dry-run') === 'true') || rawBody.isDryRun === true;
+    const traceId = headers.get('x-konsul-trace-id') || rawBody.__traceId || `trc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    // GUARDRAIL 1: Prevención Activa de Bucles Infinitos (Cycle & Cascade Blocker)
+    if (incomingDepth > 3) {
+      console.warn(`[Loop Guard] Circular execution prevented: depth=${incomingDepth} > 3, traceId=${traceId}, user=${userId}`);
+      if (userId) {
+        try {
+          await prisma.automationLog.create({
+            data: {
+              userId,
+              ruleId: 'GUARD_BLOCK_' + Date.now(),
+              sourceApp: appCode || 'unknown',
+              targetApp: 'safety_block',
+              triggerName: triggerName || 'cascade',
+              actionName: 'Bucle Infinito Prevenido',
+              status: 'FAILED',
+              errorDetails: `CIRCULAR_LOOP_PREVENTED: La ejecución superó la profundidad máxima permitida (profundidad=${incomingDepth} > 3). Se abortó la cascada para proteger la cuenta.`,
+              payloadSent: { traceId, incomingDepth, appCode, triggerName },
+              responseRec: Prisma.DbNull
+            }
+          });
+        } catch {}
+      }
+      return jsonResponse({
+        success: false,
+        error: 'Circular execution prevented (depth limit exceeded)',
+        traceId,
+        loopPrevented: true
+      }, { status: 429 });
+    }
+
     const incomingEvent = (rawBody.event || triggerName || '').toString().toLowerCase();
     const isLeadsHub = appCode === 'leadshub' 
       || sourceAppHeader === 'leadshub' 
@@ -408,7 +441,13 @@ export async function POST(req: Request) {
             }
           }
 
-          resolvedVariables[field] = val !== undefined && val !== null ? String(val) : '';
+          let cleanVal = val !== undefined && val !== null ? String(val).trim() : '';
+          const lowerField = field.toLowerCase();
+          if (lowerField.includes('monto') || lowerField.includes('total') || lowerField.includes('precio') || lowerField.includes('costo') || lowerField.includes('presupuesto')) {
+            const num = cleanVal.replace(/[^0-9.]/g, '');
+            if (num) cleanVal = num;
+          }
+          resolvedVariables[field] = cleanVal;
         } else {
           resolvedVariables[field] = targetVal || '';
         }
@@ -503,6 +542,32 @@ export async function POST(req: Request) {
           continue;
         }
 
+        if (isDryRun) {
+          const simRes = {
+            simulation: true,
+            status: 'SUCCESS',
+            targetApp: 'process',
+            template_id: templateId,
+            variables: resolvedVariables
+          };
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName: 'Ejecutar Plantilla',
+              status: 'SUCCESS',
+              errorDetails: '[SIMULACIÓN DRY-RUN] Verificación exitosa de ejecución de plantilla en Process.',
+              payloadSent: resolvedVariables,
+              responseRec: simRes
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: 'SUCCESS (DRY-RUN)', logId: log.id, preview: simRes });
+          continue;
+        }
+
         try {
           const response = await fetch('https://process.konsul.digital/api/v1/templates/execute', {
             method: 'POST',
@@ -511,7 +576,9 @@ export async function POST(req: Request) {
               'x-api-key': targetIntegration.serviceKey,
               'x-user-id': rule.userId,
               'x-user-email': userEmail,
-              'x-user-name': userName
+              'x-user-name': userName,
+              'x-konsul-trace-id': traceId,
+              'x-konsul-depth': String(incomingDepth + 1)
             },
             body: JSON.stringify({
               template_id: templateId,
@@ -649,6 +716,33 @@ export async function POST(req: Request) {
           };
         }
 
+        if (isDryRun) {
+          const simRes = {
+            simulation: true,
+            status: 'SUCCESS',
+            targetApp: 'bills',
+            action: actionName,
+            endpoint,
+            payload
+          };
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName,
+              status: 'SUCCESS',
+              errorDetails: '[SIMULACIÓN DRY-RUN] Verificación exitosa de acción en Bills.',
+              payloadSent: payload,
+              responseRec: simRes
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: 'SUCCESS (DRY-RUN)', logId: log.id, preview: simRes });
+          continue;
+        }
+
         try {
           const response = await fetch(endpoint, {
             method,
@@ -656,7 +750,9 @@ export async function POST(req: Request) {
               'Content-Type': 'application/json',
               'x-api-key': targetIntegration.serviceKey || 'konsul_sso_bills',
               'x-user-id': rule.userId,
-              'x-user-email': userEmail
+              'x-user-email': userEmail,
+              'x-konsul-trace-id': traceId,
+              'x-konsul-depth': String(incomingDepth + 1)
             },
             body: JSON.stringify(payload)
           });
@@ -744,6 +840,33 @@ export async function POST(req: Request) {
           };
         }
 
+        if (isDryRun) {
+          const simRes = {
+            simulation: true,
+            status: 'SUCCESS',
+            targetApp: 'mailing',
+            action: actionName,
+            endpoint,
+            payload
+          };
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName,
+              status: 'SUCCESS',
+              errorDetails: '[SIMULACIÓN DRY-RUN] Verificación exitosa de acción en Mailing.',
+              payloadSent: payload,
+              responseRec: simRes
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: 'SUCCESS (DRY-RUN)', logId: log.id, preview: simRes });
+          continue;
+        }
+
         try {
           const response = await fetch(endpoint, {
             method: 'POST',
@@ -752,7 +875,9 @@ export async function POST(req: Request) {
               'x-api-key': targetIntegration.serviceKey || process.env.INTERNAL_API_KEY || 'konsul_ecosystem_secret_key',
               'x-user-id': rule.userId,
               'x-user-email': userEmail,
-              'x-user-name': userName
+              'x-user-name': userName,
+              'x-konsul-trace-id': traceId,
+              'x-konsul-depth': String(incomingDepth + 1)
             },
             body: JSON.stringify(payload)
           });
@@ -906,6 +1031,35 @@ export async function POST(req: Request) {
         if (workspaceId) {
           lhHeaders['x-workspace-id'] = workspaceId;
         }
+        lhHeaders['x-konsul-trace-id'] = traceId;
+        lhHeaders['x-konsul-depth'] = String(incomingDepth + 1);
+
+        if (isDryRun) {
+          const simRes = {
+            simulation: true,
+            status: 'SUCCESS',
+            targetApp: 'leadshub',
+            action: actionName,
+            endpoint,
+            payload: requestBody
+          };
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName,
+              status: 'SUCCESS',
+              errorDetails: '[SIMULACIÓN DRY-RUN] Verificación exitosa de acción en LeadsHUB.',
+              payloadSent: requestBody,
+              responseRec: simRes
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: 'SUCCESS (DRY-RUN)', logId: log.id, preview: simRes });
+          continue;
+        }
 
         try {
           const response = await fetch(endpoint, {
@@ -976,6 +1130,33 @@ export async function POST(req: Request) {
         const actionName = actionConfig?.name || 'Acción en Kredit';
         const kreditUrl = process.env.NEXT_PUBLIC_KREDIT_URL || 'https://kredit.konsul.digital';
 
+        if (isDryRun) {
+          const simRes = {
+            simulation: true,
+            status: 'SUCCESS',
+            targetApp: 'kredit',
+            action: actionName,
+            endpoint: `${kreditUrl}/api/v1/evaluations`,
+            variables: resolvedVariables
+          };
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName,
+              status: 'SUCCESS',
+              errorDetails: '[SIMULACIÓN DRY-RUN] Verificación exitosa de acción en Kredit.',
+              payloadSent: resolvedVariables,
+              responseRec: simRes
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: 'SUCCESS (DRY-RUN)', logId: log.id, preview: simRes });
+          continue;
+        }
+
         try {
           const response = await fetch(`${kreditUrl}/api/v1/evaluations`, {
             method: 'POST',
@@ -984,7 +1165,9 @@ export async function POST(req: Request) {
               'x-api-key': targetIntegration.serviceKey || 'konsul_ecosystem_secret_key',
               'x-user-id': rule.userId,
               'x-user-email': userEmail,
-              'x-user-name': userName
+              'x-user-name': userName,
+              'x-konsul-trace-id': traceId,
+              'x-konsul-depth': String(incomingDepth + 1)
             },
             body: JSON.stringify({
               action: actionName,
