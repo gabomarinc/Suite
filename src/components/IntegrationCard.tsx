@@ -2420,8 +2420,8 @@ export default function IntegrationCard({
                       <>
                         <p>
                           {isConnected 
-                            ? `Tu empresa de QuickBooks Online está conectada. Los eventos en Intuit pueden activar automatizaciones en Kônsul Suite, y tus flujos de Suite pueden emitir facturas y crear clientes en QuickBooks.`
-                            : `Las credenciales de Intuit están configuradas. Haz clic en el botón para iniciar sesión en QuickBooks y autorizar a Kônsul Suite.`}
+                            ? `Tu empresa de QuickBooks Online está conectada. Los eventos en Intuit activan automatizaciones en la Suite, y tus flujos sincronizan facturas, clientes y cuentas contables en tiempo real.`
+                            : `Conecta tu empresa de QuickBooks Online con un solo clic mediante el acceso oficial de Intuit para habilitar automatizaciones contables y sincronización de facturación.`}
                         </p>
 
                         <div className="sso-account-info-box">
