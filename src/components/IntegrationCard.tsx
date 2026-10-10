@@ -15,7 +15,8 @@ import {
   connectAppOneClick,
   disconnectApp,
   fetchRealTriggerData,
-  fetchAppStages
+  fetchAppStages,
+  saveQboApiCredentials
 } from '../app/automatizaciones/actions';
 import { ALL_APPS, APP_NAMES_MAP, type AppConfig } from '@/lib/appsConfig';
 import { useDialog } from '@/components/KonsulDialog';
@@ -87,6 +88,15 @@ export default function IntegrationCard({
   const [isConnectingSso, setIsConnectingSso] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [showDevMode, setShowDevMode] = useState(false);
+
+  // Third-Party (QuickBooks) In-App Setup States
+  const [showQboSetup, setShowQboSetup] = useState(!thirdParty?.isConfigured);
+  const [qboClientId, setQboClientId] = useState('');
+  const [qboClientSecret, setQboClientSecret] = useState('');
+  const [qboEnv, setQboEnv] = useState<'sandbox' | 'production'>((thirdParty?.environment as any) || 'production');
+  const [isSavingQbo, setIsSavingQbo] = useState(false);
+  const [copiedRedirectUri, setCopiedRedirectUri] = useState(false);
+  const [showSecretText, setShowSecretText] = useState(false);
 
   // Accordion & Tab State
   const [isExpanded, setIsExpanded] = useState(false);
@@ -263,14 +273,54 @@ export default function IntegrationCard({
     }
   };
 
+  const handleSaveQboCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!qboClientId.trim() || !qboClientSecret.trim()) {
+      showAlert({
+        type: 'warning',
+        title: 'Campos requeridos',
+        message: 'Por favor ingresa tanto el Client ID como el Client Secret proporcionados por Intuit Developer.'
+      });
+      return;
+    }
+    setIsSavingQbo(true);
+    try {
+      const res = await saveQboApiCredentials({
+        clientId: qboClientId.trim(),
+        clientSecret: qboClientSecret.trim(),
+        environment: qboEnv
+      });
+      if (res.success && res.connectUrl) {
+        showToast({
+          type: 'success',
+          title: 'Credenciales guardadas',
+          message: 'Redirigiendo a Intuit para autorizar la conexión...'
+        });
+        window.location.href = res.connectUrl;
+      }
+    } catch (err: any) {
+      console.error(err);
+      showAlert({
+        type: 'error',
+        title: 'Error al guardar credenciales',
+        message: err.message || 'No se pudieron guardar las credenciales de Intuit.'
+      });
+    } finally {
+      setIsSavingQbo(false);
+    }
+  };
+
   const handleConnectSso = async () => {
     // Conexión de tercero: OAuth 2.0 del proveedor externo (redirección completa).
     if (thirdParty) {
       if (!thirdParty.isConfigured) {
-        showAlert({
-          type: 'warning',
-          title: `${app.name} aún no está habilitado`,
-          message: `Falta configurar las credenciales de la app de ${thirdParty.vendor} en el servidor (variables QUICKBOOKS_CLIENT_ID y QUICKBOOKS_CLIENT_SECRET).`
+        setIsExpanded(true);
+        setActiveTab('credentials');
+        setShowQboSetup(true);
+        showToast({
+          type: 'info',
+          title: 'Configura tus claves de Intuit',
+          message: 'Ingresa tu Client ID y Secret para autorizar la conexión con QuickBooks Online.'
         });
         return;
       }
@@ -815,7 +865,7 @@ export default function IntegrationCard({
               ) : (
                 <>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-                  <span>Vincular en 1 Clic</span>
+                  <span>{thirdParty ? (thirdParty.isConfigured ? 'Conectar con Intuit' : 'Configurar Intuit') : 'Vincular en 1 Clic'}</span>
                 </>
               )}
             </button>
@@ -2093,96 +2143,390 @@ export default function IntegrationCard({
                       </div>
                     </div>
 
-                    <p>
-                      {isConnected 
-                        ? `Tu empresa de QuickBooks Online está conectada. Los eventos en Intuit pueden activar automatizaciones en Kônsul Suite, y tus flujos de Suite pueden emitir facturas y crear clientes en QuickBooks.`
-                        : `Conecta tu empresa de QuickBooks Online con un solo clic mediante el flujo seguro de inicio de sesión de Intuit.`}
-                    </p>
+                    {/* FORMULARIO DE CONFIGURACIÓN DE CREDENCIALES (INTUIT DEVELOPER) */}
+                    {(!thirdParty.isConfigured || showQboSetup) ? (
+                      <div style={{
+                        background: '#ffffff',
+                        border: '1.5px solid #fed7aa',
+                        borderRadius: '12px',
+                        padding: '1.25rem',
+                        marginBottom: '1.25rem',
+                        boxShadow: '0 4px 14px rgba(217, 119, 6, 0.08)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{
+                              background: '#f59e0b',
+                              color: '#ffffff',
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.75rem',
+                              fontWeight: 800
+                            }}>⚡</span>
+                            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                              Configura tu Conexión con Intuit Developer
+                            </h4>
+                          </div>
 
-                    <div className="sso-account-info-box">
-                      <div className="sso-account-item">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-                        </svg>
-                        <div className="sso-account-details">
-                          <span className="sso-account-label">Empresa en QuickBooks (Intuit)</span>
-                          <span className="sso-account-email" style={{ fontWeight: 700, color: '#0f172a' }}>
-                            {thirdParty.companyName || (isConnected ? `Compañía ID: ${thirdParty.realmId || 'Conectada'}` : 'Pendiente de vinculación')}
-                          </span>
+                          {thirdParty.isConfigured && (
+                            <button
+                              type="button"
+                              onClick={() => setShowQboSetup(false)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#64748b',
+                                fontSize: '0.75rem',
+                                cursor: 'pointer',
+                                textDecoration: 'underline'
+                              }}
+                            >
+                              ✕ Cerrar formulario
+                            </button>
+                          )}
                         </div>
-                      </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
-                        <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                          Entorno: <strong>{thirdParty.environment === 'sandbox' ? 'Sandbox' : 'Producción'}</strong>
-                        </span>
-                        <a 
-                          href={thirdParty.docsUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          style={{ fontSize: '0.75rem', color: '#0284c7', textDecoration: 'underline', fontWeight: 600 }}
-                        >
-                          Documentación Oficial Intuit API ↗
-                        </a>
-                      </div>
-                    </div>
+                        <p style={{ fontSize: '0.82rem', color: '#475569', lineHeight: 1.5, margin: '0 0 1rem 0' }}>
+                          Para autorizar la sincronización con tu empresa en QuickBooks, registra una App en el portal de desarrolladores de Intuit y coloca tus claves aquí:
+                        </p>
 
-                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      {isConnected ? (
-                        <>
+                        {/* PASO 1: REDIRECT URI COPIABLE */}
+                        <div style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          padding: '0.85rem',
+                          marginBottom: '1rem'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              1. Redirect URI para tu App en Intuit Developer:
+                            </label>
+                            <a
+                              href="https://developer.intuit.com/app/developer/dashboard"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 700, textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                            >
+                              Abrir Intuit Developer Dashboard ↗
+                            </a>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                            <input
+                              type="text"
+                              readOnly
+                              value={typeof window !== 'undefined' ? `${window.location.origin}/api/integrations/quickbooks/callback` : '/api/integrations/quickbooks/callback'}
+                              style={{
+                                flex: 1,
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '6px',
+                                padding: '0.55rem 0.75rem',
+                                fontSize: '0.82rem',
+                                color: '#0f172a',
+                                fontFamily: 'monospace'
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const uri = `${window.location.origin}/api/integrations/quickbooks/callback`;
+                                navigator.clipboard.writeText(uri);
+                                setCopiedRedirectUri(true);
+                                setTimeout(() => setCopiedRedirectUri(false), 2000);
+                              }}
+                              style={{
+                                background: copiedRedirectUri ? '#dcfce7' : '#0f172a',
+                                color: copiedRedirectUri ? '#15803d' : '#ffffff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '0.55rem 0.95rem',
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                whiteSpace: 'nowrap',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              {copiedRedirectUri ? (
+                                <>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                  <span>¡Copiado!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                  <span>Copiar URI</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>
+                            Copia esta URI y pégala en tu App de Intuit bajo <strong>Keys & credentials → Redirect URIs</strong>.
+                          </p>
+                        </div>
+
+                        {/* PASO 2: FORMULARIO CLIENT ID / SECRET / ENTORNO */}
+                        <form onSubmit={handleSaveQboCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
+                            {/* Client ID */}
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                                2. Client ID de Intuit *
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="Ej: AB11XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+                                value={qboClientId}
+                                onChange={(e) => setQboClientId(e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.6rem 0.8rem',
+                                  border: '1.5px solid #cbd5e1',
+                                  borderRadius: '8px',
+                                  fontSize: '0.85rem',
+                                  color: '#0f172a',
+                                  outline: 'none',
+                                  boxSizing: 'border-box'
+                                }}
+                              />
+                            </div>
+
+                            {/* Client Secret */}
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                                3. Client Secret de Intuit *
+                              </label>
+                              <div style={{ position: 'relative' }}>
+                                <input
+                                  type={showSecretText ? 'text' : 'password'}
+                                  required
+                                  placeholder="Ej: XXXXXXXXXXXXXXXX..."
+                                  value={qboClientSecret}
+                                  onChange={(e) => setQboClientSecret(e.target.value)}
+                                  style={{
+                                    width: '100%',
+                                    padding: '0.6rem 2.4rem 0.6rem 0.8rem',
+                                    border: '1.5px solid #cbd5e1',
+                                    borderRadius: '8px',
+                                    fontSize: '0.85rem',
+                                    color: '#0f172a',
+                                    outline: 'none',
+                                    boxSizing: 'border-box'
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowSecretText(!showSecretText)}
+                                  style={{
+                                    position: 'absolute',
+                                    right: '8px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: '#64748b',
+                                    padding: '4px'
+                                  }}
+                                  title={showSecretText ? 'Ocultar Secret' : 'Mostrar Secret'}
+                                >
+                                  {showSecretText ? (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                                  ) : (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Selector Entorno */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.2rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
+                              Entorno de Intuit:
+                            </span>
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem', color: '#0f172a', cursor: 'pointer' }}>
+                              <input
+                                type="radio"
+                                name="qboEnv"
+                                value="production"
+                                checked={qboEnv === 'production'}
+                                onChange={() => setQboEnv('production')}
+                              />
+                              <span style={{ fontWeight: 600 }}>Producción</span>
+                              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>(Empresa Real)</span>
+                            </label>
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem', color: '#0f172a', cursor: 'pointer' }}>
+                              <input
+                                type="radio"
+                                name="qboEnv"
+                                value="sandbox"
+                                checked={qboEnv === 'sandbox'}
+                                onChange={() => setQboEnv('sandbox')}
+                              />
+                              <span style={{ fontWeight: 600 }}>Sandbox</span>
+                              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>(Pruebas)</span>
+                            </label>
+                          </div>
+
+                          {/* Botón Guardar y Conectar */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                            <button
+                              type="submit"
+                              disabled={isSavingQbo}
+                              className="btn-brand-teal"
+                              style={{
+                                background: '#059669',
+                                color: '#ffffff',
+                                fontWeight: 700,
+                                padding: '0.75rem 1.4rem',
+                                borderRadius: '10px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                border: 'none',
+                                cursor: isSavingQbo ? 'not-allowed' : 'pointer'
+                              }}
+                            >
+                              {isSavingQbo ? (
+                                <>
+                                  <svg className="spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+                                  <span>Guardando y redirigiendo a Intuit...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                                  <span>Guardar Credenciales y Conectar con QuickBooks ↗</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    ) : null}
+
+                    {/* VISTA CUANDO YA ESTÁ CONFIGURADO */}
+                    {thirdParty.isConfigured && !showQboSetup && (
+                      <>
+                        <p>
+                          {isConnected 
+                            ? `Tu empresa de QuickBooks Online está conectada. Los eventos en Intuit pueden activar automatizaciones en Kônsul Suite, y tus flujos de Suite pueden emitir facturas y crear clientes en QuickBooks.`
+                            : `Las credenciales de Intuit están configuradas. Haz clic en el botón para iniciar sesión en QuickBooks y autorizar a Kônsul Suite.`}
+                        </p>
+
+                        <div className="sso-account-info-box">
+                          <div className="sso-account-item">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                            </svg>
+                            <div className="sso-account-details">
+                              <span className="sso-account-label">Empresa en QuickBooks (Intuit)</span>
+                              <span className="sso-account-email" style={{ fontWeight: 700, color: '#0f172a' }}>
+                                {thirdParty.companyName || (isConnected ? `Compañía ID: ${thirdParty.realmId || 'Conectada'}` : 'Pendiente de vinculación')}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
+                            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                              Entorno: <strong>{thirdParty.environment === 'sandbox' ? 'Sandbox' : 'Producción'}</strong>
+                            </span>
+                            <a 
+                              href={thirdParty.docsUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              style={{ fontSize: '0.75rem', color: '#0284c7', textDecoration: 'underline', fontWeight: 600 }}
+                            >
+                              Documentación Oficial Intuit API ↗
+                            </a>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          {isConnected ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={handleTestThirdParty}
+                                className="btn-test-connection"
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                                <span>Probar Conexión con Intuit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleConnectSso}
+                                className="btn-quick-connect"
+                                style={{ background: '#f8fafc', color: '#0f172a', border: '1px solid #cbd5e1' }}
+                                title="Reautorizar tokens de Intuit"
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                                <span>Reconectar</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleDisconnectSso}
+                                disabled={isDisconnecting}
+                                className="btn-sso-disconnect"
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                                <span>{isDisconnecting ? 'Desconectando...' : 'Desconectar QuickBooks'}</span>
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleConnectSso}
+                              disabled={isConnectingSso}
+                              className="btn-brand-teal"
+                              style={{
+                                background: '#059669',
+                                color: '#ffffff',
+                                fontWeight: 700,
+                                padding: '0.75rem 1.4rem',
+                                borderRadius: '12px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                border: 'none',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                              <span>Conectar con QuickBooks (OAuth 2.0) ↗</span>
+                            </button>
+                          )}
+
                           <button
                             type="button"
-                            onClick={handleTestThirdParty}
-                            className="btn-test-connection"
+                            onClick={() => setShowQboSetup(true)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#0284c7',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              textDecoration: 'underline',
+                              cursor: 'pointer',
+                              padding: '0.4rem 0.6rem'
+                            }}
                           >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-                            <span>Probar Conexión con Intuit</span>
+                            ⚙️ Modificar claves de API (Client ID / Secret)
                           </button>
-                          <button
-                            type="button"
-                            onClick={handleConnectSso}
-                            className="btn-quick-connect"
-                            style={{ background: '#f8fafc', color: '#0f172a', border: '1px solid #cbd5e1' }}
-                            title="Reautorizar tokens de Intuit"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-                            <span>Reconectar</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleDisconnectSso}
-                            disabled={isDisconnecting}
-                            className="btn-sso-disconnect"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-                            <span>{isDisconnecting ? 'Desconectando...' : 'Desconectar QuickBooks'}</span>
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={handleConnectSso}
-                          disabled={isConnectingSso}
-                          className="btn-brand-teal"
-                          style={{
-                            background: '#059669',
-                            color: '#ffffff',
-                            fontWeight: 700,
-                            padding: '0.75rem 1.4rem',
-                            borderRadius: '12px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            border: 'none',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-                          <span>Conectar con QuickBooks (OAuth 2.0)</span>
-                        </button>
-                      )}
-                    </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               ) : (

@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { ALL_APPS } from "@/lib/appsConfig";
 import * as qbo from "@/lib/quickbooks";
+import fs from 'fs';
+import path from 'path';
 
 export async function toggleIntegration(appCode: string, currentStatus: boolean) {
   const { isAuthenticated, getUser } = getKindeServerSession();
@@ -118,6 +120,53 @@ export async function disconnectApp(appCode: string) {
 
   revalidatePath('/automatizaciones');
   return { success: true };
+}
+
+export async function saveQboApiCredentials(data: {
+  clientId: string;
+  clientSecret: string;
+  environment?: 'sandbox' | 'production';
+}) {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  if (!(await isAuthenticated())) throw new Error("No autenticado");
+  const user = await getUser();
+  if (!user?.id) throw new Error("Usuario no encontrado");
+
+  const cleanClientId = (data.clientId || '').trim();
+  const cleanClientSecret = (data.clientSecret || '').trim();
+  const cleanEnv = (data.environment || 'production').toLowerCase() === 'sandbox' ? 'sandbox' : 'production';
+
+  if (!cleanClientId || !cleanClientSecret) {
+    throw new Error("El Client ID y Client Secret de Intuit son obligatorios.");
+  }
+
+  process.env.QUICKBOOKS_CLIENT_ID = cleanClientId;
+  process.env.QUICKBOOKS_CLIENT_SECRET = cleanClientSecret;
+  process.env.QUICKBOOKS_ENVIRONMENT = cleanEnv;
+
+  try {
+    const envPath = path.join(process.cwd(), '.env.local');
+    let content = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+
+    const replaceOrAppend = (text: string, key: string, val: string) => {
+      const regex = new RegExp(`^${key}=.*$`, 'm');
+      if (regex.test(text)) {
+        return text.replace(regex, `${key}="${val}"`);
+      }
+      return `${text.trimEnd()}\n${key}="${val}"\n`;
+    };
+
+    content = replaceOrAppend(content, 'QUICKBOOKS_CLIENT_ID', cleanClientId);
+    content = replaceOrAppend(content, 'QUICKBOOKS_CLIENT_SECRET', cleanClientSecret);
+    content = replaceOrAppend(content, 'QUICKBOOKS_ENVIRONMENT', cleanEnv);
+
+    fs.writeFileSync(envPath, content, 'utf8');
+  } catch (e) {
+    console.warn("No se pudo escribir en .env.local, se mantienen variables en memoria:", e);
+  }
+
+  revalidatePath('/automatizaciones');
+  return { success: true, connectUrl: '/api/integrations/quickbooks/connect' };
 }
 
 export async function saveServiceKey(appCode: string, serviceKey: string) {
