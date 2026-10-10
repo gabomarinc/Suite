@@ -43,6 +43,33 @@ model User {
   integrations         Integration[]
   automationRules      AutomationRule[]
   automationLogs       AutomationLog[]
+  thirdPartyConnections ThirdPartyConnection[]
+}
+
+// Conexiones con proveedores EXTERNOS (no operados por Kônsul), ej. QuickBooks Online (Intuit).
+// Guarda los tokens OAuth 2.0 separados de las integraciones internas de la Suite.
+model ThirdPartyConnection {
+  id                    String    @id @default(cuid())
+  userId                String
+  provider              String    // "quickbooks"
+  externalAccountId     String    // QuickBooks realmId (Company ID)
+  companyName           String?
+  environment           String    @default("production") // "sandbox" | "production"
+  accessToken           String
+  refreshToken          String
+  accessTokenExpiresAt  DateTime
+  refreshTokenExpiresAt DateTime?
+  scopes                String?
+  status                String    @default("CONNECTED") // "CONNECTED" | "EXPIRED" | "REVOKED" | "ERROR"
+  lastError             String?
+  lastSyncedAt          DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([provider, externalAccountId])
 }
 
 model App {

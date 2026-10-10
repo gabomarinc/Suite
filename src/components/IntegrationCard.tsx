@@ -30,6 +30,18 @@ interface AppItem {
   keyPrefix: string;
 }
 
+export interface ThirdPartyInfo {
+  vendor: string;
+  connectUrl: string;
+  docsUrl: string;
+  isConfigured: boolean;
+  companyName?: string | null;
+  realmId?: string | null;
+  environment?: string | null;
+  status?: string | null;
+  lastError?: string | null;
+}
+
 interface IntegrationCardProps {
   app: AppItem;
   initialIsActive: boolean;
@@ -37,6 +49,8 @@ interface IntegrationCardProps {
   initialRules: any[];
   userEmail?: string;
   userName?: string;
+  /** Si se define, la app es una CONEXIÓN DE TERCERO (no Kônsul) con OAuth propio. */
+  thirdParty?: ThirdPartyInfo;
 }
 
 interface AutomationRule {
@@ -58,6 +72,7 @@ export default function IntegrationCard({
   initialRules,
   userEmail = '',
   userName = '',
+  thirdParty,
 }: IntegrationCardProps) {
   const { showToast, showConfirm, showAlert } = useDialog();
   const [isActive, setIsActive] = useState(initialIsActive);
@@ -249,6 +264,20 @@ export default function IntegrationCard({
   };
 
   const handleConnectSso = async () => {
+    // Conexión de tercero: OAuth 2.0 del proveedor externo (redirección completa).
+    if (thirdParty) {
+      if (!thirdParty.isConfigured) {
+        showAlert({
+          type: 'warning',
+          title: `${app.name} aún no está habilitado`,
+          message: `Falta configurar las credenciales de la app de ${thirdParty.vendor} en el servidor (variables QUICKBOOKS_CLIENT_ID y QUICKBOOKS_CLIENT_SECRET).`
+        });
+        return;
+      }
+      setIsConnectingSso(true);
+      window.location.href = thirdParty.connectUrl;
+      return;
+    }
     setIsConnectingSso(true);
     setTestStatus('loading');
     setTestLog([
@@ -385,6 +414,19 @@ export default function IntegrationCard({
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleTestThirdParty = async () => {
+    setTestStatus('loading');
+    setTestLog([`Probando conexión con ${app.name} (${thirdParty?.vendor || 'tercero'})...`]);
+    try {
+      const result = await testIntegration(app.code, serviceKey || '');
+      setTestLog(prev => [...prev, ...(result.logs || []), ...(result.success ? [] : [`Error: ${result.message}`])]);
+      setTestStatus(result.success ? 'success' : 'error');
+    } catch (err: any) {
+      setTestLog(prev => [...prev, `Error: ${err?.message || 'fallo de red'}`]);
+      setTestStatus('error');
     }
   };
 
@@ -662,8 +704,8 @@ export default function IntegrationCard({
   const currentAppRules = rules.filter(r => r.sourceApp === app.code || r.targetApp === app.code);
   const isConnected = !!serviceKey && isActive;
 
-  // Destination apps: Bills, Process, and Mailing are ALWAYS available as targets for all apps
-  const DESTINATION_ORDER = ['bills', 'process', 'mailing', 'leadshub', 'kredit'];
+  // Destination apps: Bills, Process, Mailing, LeadsHUB, Kredit and QuickBooks (Third Party)
+  const DESTINATION_ORDER = ['bills', 'process', 'mailing', 'leadshub', 'kredit', 'quickbooks'];
   const availableTargetApps = DESTINATION_ORDER
     .map(code => ALL_APPS[code])
     .filter(Boolean);
@@ -688,7 +730,7 @@ export default function IntegrationCard({
     : (targetAppConfig.actions[selectedActionIdx]?.name || 'Acción');
 
   return (
-    <div className={`app-list-row ${isExpanded ? 'expanded' : ''}`}>
+    <div className={`app-list-row ${isExpanded ? 'expanded' : ''} ${thirdParty ? 'third-party-row' : ''}`}>
       
       {/* Horizontal List Header Row */}
       <div 
@@ -696,8 +738,8 @@ export default function IntegrationCard({
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="app-list-left">
-          {/* App Icon: Uniform Kônsul green for all apps in the list */}
-          <div className="app-icon-with-check" style={{ background: '#f0fdfa', color: '#00a884' }}>
+          {/* App Icon */}
+          <div className="app-icon-with-check" style={{ background: thirdParty ? '#fef3c7' : '#f0fdfa', color: thirdParty ? '#d97706' : '#00a884' }}>
             {app.icon}
             {isConnected && (
               <div className="app-icon-check-badge">✓</div>
@@ -705,8 +747,26 @@ export default function IntegrationCard({
           </div>
 
           <div>
-            <div className="app-title-group">
+            <div className="app-title-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
               <h4>{app.name}</h4>
+              {thirdParty && (
+                <span style={{
+                  background: 'rgba(217, 119, 6, 0.12)',
+                  color: '#b45309',
+                  border: '1px solid rgba(217, 119, 6, 0.28)',
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  padding: '0.15rem 0.5rem',
+                  borderRadius: '999px',
+                  letterSpacing: '0.04em',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem'
+                }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#d97706' }}></span>
+                  CONEXIÓN DE TERCERO · {thirdParty.vendor.toUpperCase()}
+                </span>
+              )}
               {isConnected ? (
                 <span className="app-badge-pill-connected">CONECTADO</span>
               ) : (
@@ -716,12 +776,20 @@ export default function IntegrationCard({
             
             <div className="app-meta-tags">
               <span className="app-meta-tag-item">
-                <strong>AUTENTICACIÓN:</strong> {serviceKey?.startsWith('konsul_sso_') ? 'KÔNSUL SSO (1 CLIC)' : isConnected ? 'SERVICE KEY' : 'KÔNSUL SSO'}
+                <strong>AUTENTICACIÓN:</strong> {thirdParty ? `OAUTH 2.0 (${thirdParty.vendor})` : serviceKey?.startsWith('konsul_sso_') ? 'KÔNSUL SSO (1 CLIC)' : isConnected ? 'SERVICE KEY' : 'KÔNSUL SSO'}
               </span>
               <span>•</span>
               <span className="app-meta-tag-item">
-                <strong>TIPO:</strong> {app.description.toUpperCase()}
+                <strong>TIPO:</strong> {thirdParty ? `SERVICIO EXTERNO / ${thirdParty.vendor.toUpperCase()}` : app.description.toUpperCase()}
               </span>
+              {thirdParty?.companyName && (
+                <>
+                  <span>•</span>
+                  <span className="app-meta-tag-item" style={{ color: '#0d9488', fontWeight: 700 }}>
+                    <strong>EMPRESA:</strong> {thirdParty.companyName}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1940,119 +2008,298 @@ export default function IntegrationCard({
           {activeTab === 'credentials' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               
-              {/* PRIMARY 1-CLICK KÔNSUL SSO CONNECTION CARD */}
-              <div className={`sso-connect-card ${isConnected ? 'connected' : ''}`}>
-                <div className="sso-card-header">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{
-                      width: '42px',
-                      height: '42px',
-                      borderRadius: '12px',
-                      background: isConnected ? '#dcfce7' : '#f1f5f9',
-                      color: isConnected ? '#15803d' : '#64748b',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                      </svg>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        Autenticación Unificada
+              {/* PRIMARY CONNECTION CARD */}
+              {thirdParty ? (
+                /* THIRD-PARTY CONNECTION CARD (QUICKBOOKS ONLINE) */
+                <div className={`sso-connect-card ${isConnected ? 'connected' : ''}`} style={{
+                  border: isConnected ? '1.5px solid #22c55e' : '1.5px solid #f59e0b',
+                  background: isConnected ? '#ffffff' : '#fffbeb'
+                }}>
+                  <div className="sso-card-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '12px',
+                        background: isConnected ? '#dcfce7' : '#fef3c7',
+                        color: isConnected ? '#15803d' : '#d97706',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <line x1="2" y1="12" x2="22" y2="12"></line>
+                          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                        </svg>
                       </div>
-                      <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                        Kônsul SSO (1 Clic)
-                      </h3>
-                    </div>
-                  </div>
-
-                  {isConnected ? (
-                    <span className="sso-badge-pill connected">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"></circle></svg>
-                      <span>VINCULADO Y ACTIVO</span>
-                    </span>
-                  ) : (
-                    <span className="sso-badge-pill disconnected">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"></circle></svg>
-                      <span>NO VINCULADO</span>
-                    </span>
-                  )}
-                </div>
-
-                <div className="sso-card-body">
-                  <p>
-                    {isConnected 
-                      ? `${app.name} está conectada y sincronizada con tu cuenta. Las automatizaciones pueden intercambiar datos en tiempo real de forma instantánea.`
-                      : `Conecta ${app.name} con un solo clic. El ecosistema aprovisiona y sincroniza tu cuenta automáticamente con tu sesión de Kônsul sin requerir tokens ni configuraciones complejas.`}
-                  </p>
-
-                  <div className="sso-account-info-box">
-                    <div className="sso-account-item">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                      </svg>
-                      <div className="sso-account-details">
-                        <span className="sso-account-label">Cuenta Kônsul Activa</span>
-                        <span className="sso-account-email">{userEmail || 'somos@konsul.digital'}</span>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            color: '#b45309',
+                            background: 'rgba(217, 119, 6, 0.15)',
+                            padding: '0.1rem 0.45rem',
+                            borderRadius: '6px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em'
+                          }}>
+                            CONEXIÓN DE TERCERO
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                            {thirdParty.vendor}
+                          </span>
+                        </div>
+                        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: '0.2rem 0 0 0' }}>
+                          QuickBooks Online Accounting API
+                        </h3>
                       </div>
                     </div>
 
-                    <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                      Protocolo Kônsul Connect v1
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     {isConnected ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setInputKey(serviceKey);
-                            handleTestConnection();
-                          }}
-                          className="btn-test-connection"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-                          <span>Probar Conexión</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleDisconnectSso}
-                          disabled={isDisconnecting}
-                          className="btn-sso-disconnect"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-                          <span>{isDisconnecting ? 'Desconectando...' : 'Desconectar App'}</span>
-                        </button>
-                      </>
+                      <span className="sso-badge-pill connected">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"></circle></svg>
+                        <span>AUTORIZADO Y ACTIVO</span>
+                      </span>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={handleConnectSso}
-                        disabled={isConnectingSso}
-                        className="btn-sso-connect"
-                      >
-                        {isConnectingSso ? (
-                          <>
-                            <svg className="spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
-                            <span>Vinculando mediante SSO...</span>
-                          </>
-                        ) : (
-                          <>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-                            <span>Vincular {app.name} en 1 Clic</span>
-                          </>
-                        )}
-                      </button>
+                      <span className="sso-badge-pill disconnected" style={{ background: '#fef3c7', color: '#b45309' }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"></circle></svg>
+                        <span>NO CONECTADO</span>
+                      </span>
                     )}
                   </div>
+
+                  <div className="sso-card-body">
+                    {/* Clear Third-Party Notice Banner */}
+                    <div style={{
+                      background: 'rgba(245, 158, 11, 0.08)',
+                      border: '1px solid rgba(245, 158, 11, 0.25)',
+                      borderRadius: '10px',
+                      padding: '0.75rem 1rem',
+                      marginBottom: '1rem',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '0.65rem'
+                    }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                      <div style={{ fontSize: '0.82rem', color: '#92400e', lineHeight: 1.45 }}>
+                        <strong>Aviso de integración externa:</strong> QuickBooks Online es un servicio provisto y operado por <strong>{thirdParty.vendor}</strong>. Al conectar, autorizas a Kônsul Suite a sincronizar clientes, facturas, cotizaciones y cuentas contables con tu empresa en Intuit mediante OAuth 2.0 seguro.
+                      </div>
+                    </div>
+
+                    <p>
+                      {isConnected 
+                        ? `Tu empresa de QuickBooks Online está conectada. Los eventos en Intuit pueden activar automatizaciones en Kônsul Suite, y tus flujos de Suite pueden emitir facturas y crear clientes en QuickBooks.`
+                        : `Conecta tu empresa de QuickBooks Online con un solo clic mediante el flujo seguro de inicio de sesión de Intuit.`}
+                    </p>
+
+                    <div className="sso-account-info-box">
+                      <div className="sso-account-item">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                        </svg>
+                        <div className="sso-account-details">
+                          <span className="sso-account-label">Empresa en QuickBooks (Intuit)</span>
+                          <span className="sso-account-email" style={{ fontWeight: 700, color: '#0f172a' }}>
+                            {thirdParty.companyName || (isConnected ? `Compañía ID: ${thirdParty.realmId || 'Conectada'}` : 'Pendiente de vinculación')}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
+                        <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                          Entorno: <strong>{thirdParty.environment === 'sandbox' ? 'Sandbox' : 'Producción'}</strong>
+                        </span>
+                        <a 
+                          href={thirdParty.docsUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          style={{ fontSize: '0.75rem', color: '#0284c7', textDecoration: 'underline', fontWeight: 600 }}
+                        >
+                          Documentación Oficial Intuit API ↗
+                        </a>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      {isConnected ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleTestThirdParty}
+                            className="btn-test-connection"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                            <span>Probar Conexión con Intuit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleConnectSso}
+                            className="btn-quick-connect"
+                            style={{ background: '#f8fafc', color: '#0f172a', border: '1px solid #cbd5e1' }}
+                            title="Reautorizar tokens de Intuit"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                            <span>Reconectar</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDisconnectSso}
+                            disabled={isDisconnecting}
+                            className="btn-sso-disconnect"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                            <span>{isDisconnecting ? 'Desconectando...' : 'Desconectar QuickBooks'}</span>
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleConnectSso}
+                          disabled={isConnectingSso}
+                          className="btn-brand-teal"
+                          style={{
+                            background: '#059669',
+                            color: '#ffffff',
+                            fontWeight: 700,
+                            padding: '0.75rem 1.4rem',
+                            borderRadius: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            border: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                          <span>Conectar con QuickBooks (OAuth 2.0)</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* NATIVE KÔNSUL SSO CONNECTION CARD */
+                <div className={`sso-connect-card ${isConnected ? 'connected' : ''}`}>
+                  <div className="sso-card-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '12px',
+                        background: isConnected ? '#dcfce7' : '#f1f5f9',
+                        color: isConnected ? '#15803d' : '#64748b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0d9488', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          Autenticación Unificada
+                        </div>
+                        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                          Kônsul SSO (1 Clic)
+                        </h3>
+                      </div>
+                    </div>
+
+                    {isConnected ? (
+                      <span className="sso-badge-pill connected">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"></circle></svg>
+                        <span>VINCULADO Y ACTIVO</span>
+                      </span>
+                    ) : (
+                      <span className="sso-badge-pill disconnected">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"></circle></svg>
+                        <span>NO VINCULADO</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="sso-card-body">
+                    <p>
+                      {isConnected 
+                        ? `${app.name} está conectada y sincronizada con tu cuenta. Las automatizaciones pueden intercambiar datos en tiempo real de forma instantánea.`
+                        : `Conecta ${app.name} con un solo clic. El ecosistema aprovisiona y sincroniza tu cuenta automáticamente con tu sesión de Kônsul sin requerir tokens ni configuraciones complejas.`}
+                    </p>
+
+                    <div className="sso-account-info-box">
+                      <div className="sso-account-item">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                          <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        <div className="sso-account-details">
+                          <span className="sso-account-label">Cuenta Kônsul Activa</span>
+                          <span className="sso-account-email">{userEmail || 'somos@konsul.digital'}</span>
+                        </div>
+                      </div>
+
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                        Protocolo Kônsul Connect v1
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      {isConnected ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setInputKey(serviceKey);
+                              handleTestConnection();
+                            }}
+                            className="btn-test-connection"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                            <span>Probar Conexión</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDisconnectSso}
+                            disabled={isDisconnecting}
+                            className="btn-sso-disconnect"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                            <span>{isDisconnecting ? 'Desconectando...' : 'Desconectar App'}</span>
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleConnectSso}
+                          disabled={isConnectingSso}
+                          className="btn-sso-connect"
+                        >
+                          {isConnectingSso ? (
+                            <>
+                              <svg className="spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+                              <span>Vinculando mediante SSO...</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                              <span>Vincular {app.name} en 1 Clic</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* SECONDARY DEVELOPER ACCORDION (MANUAL SERVICE KEY) */}
               <div className="dev-mode-accordion">

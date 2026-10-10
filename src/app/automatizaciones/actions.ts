@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { ALL_APPS } from "@/lib/appsConfig";
+import * as qbo from "@/lib/quickbooks";
 
 export async function toggleIntegration(appCode: string, currentStatus: boolean) {
   const { isAuthenticated, getUser } = getKindeServerSession();
@@ -90,6 +91,12 @@ export async function disconnectApp(appCode: string) {
     throw new Error("Usuario no encontrado");
   }
 
+  if (appCode === 'quickbooks') {
+    await qbo.deleteConnection(user.id);
+    revalidatePath('/automatizaciones');
+    return { success: true };
+  }
+
   await prisma.integration.upsert({
     where: {
       userId_appCode: {
@@ -149,6 +156,31 @@ export async function saveServiceKey(appCode: string, serviceKey: string) {
 }
 
 export async function testIntegration(appCode: string, serviceKey: string) {
+  // ─── CONEXIÓN DE TERCERO: QuickBooks Online ───
+  if (appCode === 'quickbooks') {
+    const { isAuthenticated, getUser } = getKindeServerSession();
+    if (!(await isAuthenticated())) throw new Error("No autenticado");
+    const user = await getUser();
+    if (!user?.id) throw new Error("Usuario no encontrado");
+    const logs: string[] = ['Servicio de tercero: QuickBooks Online (Intuit Inc.)', 'Autenticando con OAuth 2.0 de Intuit...'];
+    try {
+      const conn = await qbo.getConnection(user.id);
+      if (!conn) return { success: false, message: 'QuickBooks no está conectado. Usa "Conectar con QuickBooks".', logs };
+      logs.push(`Compañía (Realm ID): ${conn.externalAccountId} · Entorno: ${conn.environment}`);
+      const info = await qbo.getCompanyInfo(user.id);
+      logs.push(`[GET] /v3/company/${conn.externalAccountId}/companyinfo -> 200 OK`);
+      logs.push(`Empresa conectada: ${info?.CompanyName || 'Sin nombre'} (${info?.Country || '—'})`);
+      const customers = await qbo.qboQuery(user.id, 'select Id, DisplayName from Customer maxresults 1').catch(() => []);
+      logs.push(customers.length > 0 ? `[DATOS REALES] Último cliente: ${customers[0].DisplayName}` : '[DATOS REALES] Sin clientes registrados aún.');
+      if (info?.CompanyName && info.CompanyName !== conn.companyName) {
+        await prisma.thirdPartyConnection.update({ where: { id: conn.id }, data: { companyName: info.CompanyName } });
+      }
+      logs.push('Conexión con QuickBooks verificada. Lectura/Escritura habilitada.');
+      return { success: true, logs };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Error al conectar con QuickBooks', logs };
+    }
+  }
   const prefixes: Record<string, string[]> = {
     bills: ['kb_live_', 'kb_svc_', 'kb_test_', 'konsul_sso_'],
     process: ['kp_live_', 'kp_svc_', 'kp_test_', 'konsul_sso_'],
@@ -301,6 +333,28 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
     'x-source-app': 'suite',
     ...((serviceKey && !isLhKey && serviceKey !== sharedSecret) ? { 'x-workspace-id': serviceKey } : {})
   };
+
+  // 0. QUICKBOOKS (TERCERO) — muestra real desde la compañía conectada
+  if (sourceApp === 'quickbooks') {
+    const entityByIdx = ['Customer', 'Invoice', 'Payment', 'Estimate'];
+    const entity = entityByIdx[triggerIdx] || 'Customer';
+    try {
+      const conn = await qbo.getConnection(user.id);
+      if (!conn) {
+        return { success: false, data: {}, summary: 'Conecta QuickBooks para obtener datos reales.' };
+      }
+      const rows = await qbo.qboQuery(user.id, `select * from ${entity} orderby MetaData.CreateTime desc maxresults 1`);
+      if (rows[0]) {
+        const mapped = qbo.mapEntityToTriggerData(entity, rows[0], conn.environment);
+        if (mapped) {
+          return { success: true, data: mapped.data, summary: `Datos reales del último ${entity} en QuickBooks (${conn.companyName || conn.externalAccountId}).` };
+        }
+      }
+      return { success: true, data: {}, summary: `No hay registros de ${entity} en QuickBooks todavía.` };
+    } catch (err: any) {
+      return { success: false, data: {}, summary: `QuickBooks: ${err.message}` };
+    }
+  }
 
   // 1. BILLS
   if (sourceApp === 'bills') {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import IntegrationCard from "@/components/IntegrationCard";
 import KonsulCopilot from "@/components/KonsulCopilot";
+import { getQboConfig } from "@/lib/quickbooks";
 
 export default async function AutomatizacionesPage() {
   const { isAuthenticated, getUser } = getKindeServerSession();
@@ -18,10 +19,17 @@ export default async function AutomatizacionesPage() {
     redirect("/api/auth/login");
   }
 
-  // Get user integrations
+  // Get user integrations (internal)
   const dbIntegrations = await prisma.integration.findMany({
     where: { userId: kindeUser.id }
   });
+
+  // Get user third-party connections (external OAuth, e.g. QuickBooks)
+  const qboConn = await prisma.thirdPartyConnection.findUnique({
+    where: { userId_provider: { userId: kindeUser.id, provider: 'quickbooks' } }
+  }).catch(() => null);
+
+  const qboConfig = getQboConfig();
 
   // Get user automation rules from DB
   const dbRules = await prisma.automationRule.findMany({
@@ -97,6 +105,27 @@ export default async function AutomatizacionesPage() {
   });
   const connectedCount = connectedApps.length;
 
+  const isQboConnected = !!(qboConn && qboConn.status === 'CONNECTED');
+  const qboServiceKey = isQboConnected ? `qbo_realm_${qboConn.externalAccountId}` : (activeIntegrationsMap.get('quickbooks')?.serviceKey || '');
+
+  const quickbooksApp = {
+    code: 'quickbooks',
+    name: 'QuickBooks Online',
+    description: 'Contabilidad y facturación externa',
+    color: '#059669',
+    bgLight: '#ecfdf5',
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="2" y1="12" x2="22" y2="12"></line>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+      </svg>
+    ),
+    keyPrefix: 'qbo_realm_'
+  };
+
+  const totalConnectedCount = connectedCount + (isQboConnected ? 1 : 0);
+
   return (
     <main className="main-content integrations-hub-wrapper">
       
@@ -110,7 +139,7 @@ export default async function AutomatizacionesPage() {
             <span>Ecosistema & Flujos Multi-App</span>
           </div>
           <h1>Kônsul Connect</h1>
-          <p>Conecta las micro-SaaS de la suite de manera plug-and-play usando triggers y acciones unificadas.</p>
+          <p>Conecta las micro-SaaS de la suite y servicios de terceros plug-and-play usando triggers y acciones unificadas.</p>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
@@ -128,7 +157,7 @@ export default async function AutomatizacionesPage() {
       <div className="visual-hub-card-dark">
         <div className="visual-hub-top-pill">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-          <span>✦ Núcleo Central Suite & {connectedCount} {connectedCount === 1 ? 'App Enlazada' : 'Apps Enlazadas'}</span>
+          <span>✦ Núcleo Central Suite & {totalConnectedCount} {totalConnectedCount === 1 ? 'Conexión Activa' : 'Conexiones Activas'}</span>
         </div>
 
         <div className="visual-hub-container">
@@ -207,14 +236,29 @@ export default async function AutomatizacionesPage() {
         </div>
       </div>
 
-      {/* Section Header for Apps List */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', marginBottom: '0.5rem' }}>
+      {/* SECTION 1: NATIVE SUITE APPS */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', marginBottom: '0.5rem' }}>
         <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+            <span style={{
+              fontSize: '0.7rem',
+              fontWeight: 800,
+              color: '#0d9488',
+              background: '#f0fdfa',
+              border: '1px solid #ccfbf1',
+              padding: '0.15rem 0.5rem',
+              borderRadius: '6px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}>
+              NATIVAS DE LA SUITE
+            </span>
+          </div>
           <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-heading)' }}>
-            Herramientas & Flujos Disponibles
+            Herramientas & Flujos del Ecosistema
           </h3>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Haz clic en <strong>Automatizar</strong> para desplegar las reglas activas o crear una nueva conexión.
+            Aplicaciones operadas por Kônsul con sesión centralizada SSO y comunicación bidireccional en tiempo real.
           </p>
         </div>
       </div>
@@ -240,6 +284,61 @@ export default async function AutomatizacionesPage() {
         })}
       </div>
 
+      {/* SECTION 2: CONEXIONES DE TERCEROS (EXTERNAL / PROVEEDORES NO KÔNSUL) */}
+      <div id="terceros" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2.5rem', marginBottom: '0.75rem' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+            <span style={{
+              fontSize: '0.7rem',
+              fontWeight: 800,
+              color: '#b45309',
+              background: '#fffbeb',
+              border: '1px solid #fde68a',
+              padding: '0.15rem 0.55rem',
+              borderRadius: '6px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#d97706' }}></span>
+              PROVEEDORES EXTERNOS · CONEXIONES DE TERCEROS
+            </span>
+          </div>
+          <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-heading)' }}>
+            Conexiones de Terceros
+          </h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            Plataformas de terceros que se integran con la Suite mediante protocolos estándar como OAuth 2.0 y Webhooks.
+          </p>
+        </div>
+      </div>
+
+      {/* Third Party Apps List Rows */}
+      <div className="integrations-list-container" style={{ borderLeft: '3px solid #f59e0b', paddingLeft: '0.5rem' }}>
+        <IntegrationCard
+          key={quickbooksApp.code}
+          app={quickbooksApp}
+          initialIsActive={isQboConnected}
+          initialServiceKey={qboServiceKey}
+          initialRules={dbRules}
+          userEmail={kindeUser.email || ''}
+          userName={kindeUser.given_name || (kindeUser as any).name || ''}
+          thirdParty={{
+            vendor: 'Intuit Inc.',
+            connectUrl: '/api/integrations/quickbooks/connect',
+            docsUrl: 'https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/account',
+            isConfigured: qboConfig.isConfigured,
+            companyName: qboConn?.companyName,
+            realmId: qboConn?.externalAccountId,
+            environment: qboConn?.environment,
+            status: qboConn?.status,
+            lastError: qboConn?.lastError
+          }}
+        />
+      </div>
+
       {/* Kônsul Copilot Agéntico flotante (Pilar 4 y 6) */}
       <KonsulCopilot
         user={{
@@ -247,7 +346,7 @@ export default async function AutomatizacionesPage() {
           name: kindeUser.given_name || (kindeUser as any).name || 'Colega',
           email: kindeUser.email || ''
         }}
-        connectedApps={connectedApps.map(a => a.code)}
+        connectedApps={[...connectedApps.map(a => a.code), ...(isQboConnected ? ['quickbooks'] : [])]}
       />
     </main>
   );

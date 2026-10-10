@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { ALL_APPS } from '@/lib/appsConfig';
 import { Prisma } from '@prisma/client';
+import * as qbo from '@/lib/quickbooks';
+import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -298,6 +300,20 @@ export async function POST(req: Request) {
 
     if (!appCode || !triggerName || !userId) {
       return jsonResponse({ success: false, error: "Missing parameters (appCode, triggerName, userId)" }, { status: 400 });
+    }
+
+    // GUARDRAIL: los triggers de QuickBooks (tercero) solo pueden originarse desde el webhook firmado de Intuit
+    // o desde la sesión del propio usuario (botón "Probar" en la UI).
+    if (appCode === 'quickbooks' && headers.get('x-konsul-internal') !== qbo.getInternalWebhookSecret()) {
+      let isOwner = false;
+      try {
+        const session = getKindeServerSession();
+        const sessionUser = (await session.isAuthenticated()) ? await session.getUser() : null;
+        isOwner = !!sessionUser?.id && sessionUser.id === userId;
+      } catch {}
+      if (!isOwner) {
+        return jsonResponse({ success: false, error: 'QuickBooks triggers can only be dispatched by the signed Intuit webhook or the account owner' }, { status: 403 });
+      }
     }
 
     const appConfig = ALL_APPS[appCode];
@@ -1211,6 +1227,122 @@ export async function POST(req: Request) {
               errorDetails: fetchErr.message || 'Error de conexión con Kredit',
               payloadSent: resolvedVariables,
               responseRec: Prisma.DbNull
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });
+        }
+      } else if (targetApp === 'quickbooks') {
+        // ─── CONEXIÓN DE TERCERO: QuickBooks Online (Intuit) ───
+        const actionConfig = ALL_APPS.quickbooks?.actions[rule.actionIdx];
+        const actionName = actionConfig?.name || 'Acción en QuickBooks';
+        const rv = resolvedVariables;
+        const num = (v?: string) => parseFloat(String(v || '').replace(/[^0-9.]/g, '')) || 0;
+
+        const qboPayload: Record<string, any> = { action: actionName, variables: rv };
+
+        if (isDryRun) {
+          const simRes = { simulation: true, status: 'SUCCESS', targetApp: 'quickbooks', thirdParty: true, action: actionName, payload: qboPayload };
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName,
+              status: 'SUCCESS',
+              errorDetails: '[SIMULACIÓN DRY-RUN] Verificación exitosa de acción en QuickBooks Online (tercero). No se envió nada a Intuit.',
+              payloadSent: qboPayload,
+              responseRec: simRes
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: 'SUCCESS (DRY-RUN)', logId: log.id, preview: simRes });
+          continue;
+        }
+
+        try {
+          let result: any;
+          if (actionName === 'Crear o Actualizar Cliente') {
+            result = await qbo.upsertCustomer(rule.userId, {
+              name: rv['Nombre del Cliente'] || rv['Nombre de Empresa'] || data['Nombre del Lead'] || '',
+              company: rv['Nombre de Empresa'] || data['Nombre de Empresa'] || '',
+              email: rv['Email del Cliente'] || data['Email del Lead'] || '',
+              phone: rv['Teléfono'] || data['Teléfono del Lead'] || data['Teléfono del Cliente'] || '',
+              taxId: rv['RUC / Cédula'] || '',
+              address: rv['Dirección'] || '',
+              notes: rv['Notas'] || ''
+            });
+          } else if (actionName === 'Crear Factura') {
+            result = await qbo.createInvoice(rule.userId, {
+              customerName: rv['Nombre del Cliente'] || rv['Nombre de Empresa'] || '',
+              company: rv['Nombre de Empresa'] || '',
+              email: rv['Email del Cliente'] || '',
+              amount: num(rv['Monto Total']),
+              concept: rv['Concepto de Venta'] || '',
+              dueDate: rv['Fecha de Vencimiento (AAAA-MM-DD)'] || '',
+              docNumber: rv['Número de Factura'] || '',
+              itemName: rv['Producto / Servicio (nombre en QuickBooks)'] || '',
+              memo: rv['Mensaje al Cliente'] || ''
+            });
+          } else if (actionName === 'Crear Cotización (Estimate)') {
+            result = await qbo.createEstimate(rule.userId, {
+              customerName: rv['Nombre del Cliente'] || rv['Nombre de Empresa'] || '',
+              company: rv['Nombre de Empresa'] || '',
+              email: rv['Email del Cliente'] || '',
+              amount: num(rv['Monto Total']),
+              concept: rv['Concepto de Venta'] || '',
+              expirationDate: rv['Fecha de Expiración (AAAA-MM-DD)'] || ''
+            });
+          } else if (actionName === 'Registrar Pago Recibido') {
+            result = await qbo.createPayment(rule.userId, {
+              invoiceRef: rv['Número o ID de Factura'] || '',
+              customerName: rv['Nombre del Cliente'] || '',
+              email: rv['Email del Cliente'] || '',
+              amount: num(rv['Monto Pagado'])
+            });
+          } else if (actionName === 'Enviar Factura por Email') {
+            result = await qbo.sendInvoiceEmail(rule.userId, {
+              invoiceRef: rv['Número o ID de Factura'] || '',
+              email: rv['Email Destinatario'] || ''
+            });
+          } else if (actionName === 'Crear Cuenta Contable') {
+            result = await qbo.createAccount(rule.userId, {
+              name: rv['Nombre de la Cuenta'] || '',
+              accountType: rv['Tipo de Cuenta (Expense, Income, Bank...)'] || '',
+              accountNumber: rv['Número de Cuenta'] || '',
+              description: rv['Descripción'] || ''
+            });
+          } else {
+            throw new Error(`Acción de QuickBooks no soportada: ${actionName}`);
+          }
+
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName,
+              status: 'SUCCESS',
+              payloadSent: qboPayload,
+              responseRec: JSON.parse(JSON.stringify({ success: true, provider: 'QuickBooks Online (Intuit)', result }))
+            }
+          });
+          executionResults.push({ ruleId: rule.id, status: 'SUCCESS', logId: log.id });
+        } catch (qboErr: any) {
+          const log = await prisma.automationLog.create({
+            data: {
+              userId: rule.userId,
+              ruleId: rule.id,
+              sourceApp: appCode,
+              targetApp,
+              triggerName,
+              actionName,
+              status: 'FAILED',
+              errorDetails: `[QuickBooks · Tercero] ${qboErr.message || 'Error desconocido'}`,
+              payloadSent: qboPayload,
+              responseRec: qboErr.details ? JSON.parse(JSON.stringify(qboErr.details)) : Prisma.DbNull
             }
           });
           executionResults.push({ ruleId: rule.id, status: 'FAILED', logId: log.id });

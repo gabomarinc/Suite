@@ -1,6 +1,10 @@
 export interface AppConfig {
   name: string;
   code: string;
+  /** true si es un servicio EXTERNO (no operado por Kônsul), ej. QuickBooks de Intuit. */
+  isThirdParty?: boolean;
+  /** Empresa propietaria del servicio de tercero. */
+  vendor?: string;
   triggers: {
     name: string;
     description: string;
@@ -576,6 +580,115 @@ export const ALL_APPS: Record<string, AppConfig> = {
         requiredFields: ['Email del Suscriptor', 'Lista']
       }
     ]
+  },
+  // ─── CONEXIÓN DE TERCERO ─────────────────────────────────────────────
+  // QuickBooks Online es un servicio de Intuit Inc. (no operado por Kônsul).
+  // Triggers: llegan vía webhooks de Intuit (/api/webhooks/quickbooks).
+  // Acciones: Accounting API v3 con OAuth 2.0 (src/lib/quickbooks.ts).
+  quickbooks: {
+    name: 'QuickBooks Online',
+    code: 'quickbooks',
+    isThirdParty: true,
+    vendor: 'Intuit Inc.',
+    triggers: [
+      {
+        name: 'Cliente Creado en QuickBooks',
+        description: 'Se dispara cuando se crea un cliente (Customer) en QuickBooks Online.',
+        outputs: [
+          'ID de Cliente QuickBooks',
+          'Nombre del Cliente',
+          'Nombre de Empresa',
+          'Email del Cliente',
+          'Teléfono del Cliente',
+          'Dirección',
+          'Saldo Pendiente',
+          'Fecha de Creación',
+          'Enlace en QuickBooks'
+        ]
+      },
+      {
+        name: 'Factura Creada en QuickBooks',
+        description: 'Se dispara cuando se crea una factura (Invoice) en QuickBooks Online.',
+        outputs: [
+          'ID de Factura QuickBooks',
+          'Número de Factura',
+          'Nombre del Cliente',
+          'Email del Cliente',
+          'Monto Total',
+          'Saldo Pendiente',
+          'Moneda',
+          'Concepto de Venta',
+          'Fecha de Factura',
+          'Fecha de Vencimiento',
+          'Enlace en QuickBooks'
+        ]
+      },
+      {
+        name: 'Pago Recibido en QuickBooks',
+        description: 'Se dispara cuando se registra un pago recibido (Payment) en QuickBooks Online.',
+        outputs: [
+          'ID de Pago QuickBooks',
+          'Nombre del Cliente',
+          'Monto Pagado',
+          'Moneda',
+          'Fecha de Pago',
+          'Facturas Aplicadas (IDs)',
+          'Enlace en QuickBooks'
+        ]
+      },
+      {
+        name: 'Cotización Creada en QuickBooks',
+        description: 'Se dispara cuando se crea una cotización (Estimate) en QuickBooks Online.',
+        outputs: [
+          'ID de Cotización QuickBooks',
+          'Número de Cotización',
+          'Nombre del Cliente',
+          'Email del Cliente',
+          'Monto Total',
+          'Estado de Cotización',
+          'Fecha de Vencimiento',
+          'Enlace en QuickBooks'
+        ]
+      }
+    ],
+    actions: [
+      {
+        name: 'Crear o Actualizar Cliente',
+        description: 'POST /v3/company/{realmId}/customer — Busca por email/nombre y crea o actualiza el cliente.',
+        fields: ['Nombre del Cliente', 'Nombre de Empresa', 'Email del Cliente', 'Teléfono', 'RUC / Cédula', 'Dirección', 'Notas'],
+        requiredFields: ['Nombre del Cliente']
+      },
+      {
+        name: 'Crear Factura',
+        description: 'POST /v3/company/{realmId}/invoice — Crea la factura (y el cliente si no existe).',
+        fields: ['Nombre del Cliente', 'Nombre de Empresa', 'Email del Cliente', 'Monto Total', 'Concepto de Venta', 'Fecha de Vencimiento (AAAA-MM-DD)', 'Número de Factura', 'Producto / Servicio (nombre en QuickBooks)', 'Mensaje al Cliente'],
+        requiredFields: ['Nombre del Cliente', 'Monto Total']
+      },
+      {
+        name: 'Crear Cotización (Estimate)',
+        description: 'POST /v3/company/{realmId}/estimate — Genera una cotización para el cliente.',
+        fields: ['Nombre del Cliente', 'Nombre de Empresa', 'Email del Cliente', 'Monto Total', 'Concepto de Venta', 'Fecha de Expiración (AAAA-MM-DD)'],
+        requiredFields: ['Nombre del Cliente', 'Monto Total']
+      },
+      {
+        name: 'Registrar Pago Recibido',
+        description: 'POST /v3/company/{realmId}/payment — Registra un pago y lo aplica a la factura indicada.',
+        fields: ['Número o ID de Factura', 'Nombre del Cliente', 'Email del Cliente', 'Monto Pagado'],
+        requiredFields: ['Monto Pagado']
+      },
+      {
+        name: 'Enviar Factura por Email',
+        description: 'POST /v3/company/{realmId}/invoice/{id}/send — Envía la factura desde QuickBooks.',
+        fields: ['Número o ID de Factura', 'Email Destinatario'],
+        requiredFields: ['Número o ID de Factura']
+      },
+      {
+        name: 'Crear Cuenta Contable',
+        description: 'POST /v3/company/{realmId}/account — Crea una cuenta en el plan de cuentas (Account).',
+        fields: ['Nombre de la Cuenta', 'Tipo de Cuenta (Expense, Income, Bank...)', 'Número de Cuenta', 'Descripción'],
+        requiredFields: ['Nombre de la Cuenta']
+      }
+    ]
   }
 };
 
@@ -584,7 +697,11 @@ export const APP_NAMES_MAP: Record<string, string> = {
   process: 'Kônsul Process',
   leadshub: 'Kônsul LeadsHUB',
   kredit: 'Kônsul Kredit',
-  mailing: 'Kônsul Mailing'
+  mailing: 'Kônsul Mailing',
+  quickbooks: 'QuickBooks Online (Tercero)'
 };
+
+/** Códigos de apps externas (no Kônsul). */
+export const THIRD_PARTY_APP_CODES = Object.values(ALL_APPS).filter(a => a.isThirdParty).map(a => a.code);
 
 
