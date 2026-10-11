@@ -508,6 +508,18 @@ export async function POST(req: Request) {
         };
       }
 
+      if ((!targetIntegration || !targetIntegration.serviceKey) && !ALL_APPS[targetApp]?.isThirdParty && targetIntegration?.isActive !== false) {
+        targetIntegration = {
+          id: `sso_${targetApp}`,
+          userId: rule.userId,
+          appCode: targetApp,
+          serviceKey: `konsul_sso_${targetApp}`,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+      }
+
       if (!targetIntegration || !targetIntegration.isActive || !targetIntegration.serviceKey) {
         // Record failure
         const log = await prisma.automationLog.create({
@@ -585,7 +597,26 @@ export async function POST(req: Request) {
         }
 
         try {
-          const response = await fetch('https://process.konsul.digital/api/v1/templates/execute', {
+          const execBody = JSON.stringify({
+            template_id: templateId,
+            variables: {
+              ...resolvedVariables,
+              trigger_id: data['ID del Lead'] || data['ID de Factura / Documento'] || data['ID de Tarea'] || data['ID de Solicitud'] || data['id'] || '',
+              lead_id: data['ID del Lead'] || '',
+              company: resolvedVariables['Nombre de Empresa'] || data['Nombre de Empresa'] || data['Empresa'] || '',
+              company_name: resolvedVariables['Nombre de Empresa'] || data['Nombre de Empresa'] || data['Empresa'] || '',
+              empresa: resolvedVariables['Nombre de Empresa'] || data['Nombre de Empresa'] || data['Empresa'] || '',
+              contact_phone: data['Teléfono del Lead'] || data['Teléfono del Cliente'] || data['Teléfono'] || '',
+              contact_email: data['Email del Lead'] || data['Email del Cliente'] || data['Email'] || '',
+              contact_name: data['Nombre del Lead'] || data['Nombre del Cliente'] || ''
+            },
+            external_id: data['ID del Lead'] || data['ID de Factura / Documento'] || data['ID de Tarea'] || data['id'] || '',
+            customer_name: resolvedVariables['Cliente / Nombre de la Ejecución'] || data['Nombre del Lead'] || data['Nombre del Cliente'] || '',
+            customer_email: data['Email del Lead'] || data['Email del Cliente'] || '',
+            customer_phone: data['Teléfono del Lead'] || data['Teléfono del Cliente'] || ''
+          });
+
+          let response = await fetch('https://process.konsul.digital/api/v1/templates/execute', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -596,27 +627,28 @@ export async function POST(req: Request) {
               'x-konsul-trace-id': traceId,
               'x-konsul-depth': String(incomingDepth + 1)
             },
-            body: JSON.stringify({
-              template_id: templateId,
-              variables: {
-                ...resolvedVariables,
-                trigger_id: data['ID del Lead'] || data['ID de Factura / Documento'] || data['ID de Tarea'] || data['ID de Solicitud'] || data['id'] || '',
-                lead_id: data['ID del Lead'] || '',
-                company: resolvedVariables['Nombre de Empresa'] || data['Nombre de Empresa'] || data['Empresa'] || '',
-                company_name: resolvedVariables['Nombre de Empresa'] || data['Nombre de Empresa'] || data['Empresa'] || '',
-                empresa: resolvedVariables['Nombre de Empresa'] || data['Nombre de Empresa'] || data['Empresa'] || '',
-                contact_phone: data['Teléfono del Lead'] || data['Teléfono del Cliente'] || data['Teléfono'] || '',
-                contact_email: data['Email del Lead'] || data['Email del Cliente'] || data['Email'] || '',
-                contact_name: data['Nombre del Lead'] || data['Nombre del Cliente'] || ''
-              },
-              external_id: data['ID del Lead'] || data['ID de Factura / Documento'] || data['ID de Tarea'] || data['id'] || '',
-              customer_name: resolvedVariables['Cliente / Nombre de la Ejecución'] || data['Nombre del Lead'] || data['Nombre del Cliente'] || '',
-              customer_email: data['Email del Lead'] || data['Email del Cliente'] || '',
-              customer_phone: data['Teléfono del Lead'] || data['Teléfono del Cliente'] || ''
-            })
+            body: execBody
           });
 
-          const resData = await response.json();
+          let resData = await response.json().catch(() => ({}));
+
+          // Fallback a Kônsul SSO por identidad de usuario si el token manual no coincide con el workspace de la plantilla
+          if ((!response.ok || !resData.success) && targetIntegration.serviceKey !== 'konsul_sso_process' && userEmail) {
+            response = await fetch('https://process.konsul.digital/api/v1/templates/execute', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': 'konsul_sso_process',
+                'x-user-id': rule.userId,
+                'x-user-email': userEmail,
+                'x-user-name': userName,
+                'x-konsul-trace-id': traceId,
+                'x-konsul-depth': String(incomingDepth + 1)
+              },
+              body: execBody
+            });
+            resData = await response.json().catch(() => ({}));
+          }
 
           if (response.ok && resData.success) {
             const log = await prisma.automationLog.create({

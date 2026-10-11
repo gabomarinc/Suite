@@ -910,6 +910,22 @@ export async function createAutomationRule(data: {
   const user = await getUser();
   if (!user || !user.id) throw new Error("Usuario no encontrado");
 
+  // Auto-provision Kônsul SSO for native Suite apps if not yet linked
+  for (const code of [data.sourceApp, data.targetApp]) {
+    if (code && !ALL_APPS[code]?.isThirdParty) {
+      const existing = await prisma.integration.findUnique({
+        where: { userId_appCode: { userId: user.id, appCode: code } }
+      }).catch(() => null);
+      if (!existing || !existing.serviceKey) {
+        await prisma.integration.upsert({
+          where: { userId_appCode: { userId: user.id, appCode: code } },
+          update: { serviceKey: `konsul_sso_${code}`, isActive: true },
+          create: { userId: user.id, appCode: code, serviceKey: `konsul_sso_${code}`, isActive: true }
+        }).catch(() => {});
+      }
+    }
+  }
+
   const rule = await prisma.automationRule.create({
     data: {
       userId: user.id,
@@ -941,6 +957,21 @@ export async function updateAutomationRule(id: string, data: {
 
   const user = await getUser();
   if (!user || !user.id) throw new Error("Usuario no encontrado");
+
+  for (const code of [data.sourceApp, data.targetApp]) {
+    if (code && !ALL_APPS[code]?.isThirdParty) {
+      const existing = await prisma.integration.findUnique({
+        where: { userId_appCode: { userId: user.id, appCode: code } }
+      }).catch(() => null);
+      if (!existing || !existing.serviceKey) {
+        await prisma.integration.upsert({
+          where: { userId_appCode: { userId: user.id, appCode: code } },
+          update: { serviceKey: `konsul_sso_${code}`, isActive: true },
+          create: { userId: user.id, appCode: code, serviceKey: `konsul_sso_${code}`, isActive: true }
+        }).catch(() => {});
+      }
+    }
+  }
 
   const updated = await prisma.automationRule.update({
     where: {
@@ -1125,30 +1156,55 @@ export async function fetchProcessTemplates(serviceKey: string, userEmail?: stri
   if (!isAuth) throw new Error("No autenticado");
 
   const sessionUser = await getUser().catch(() => null);
-  const emailToSend = userEmail || sessionUser?.email || '';
-  const idToSend = userId || sessionUser?.id || '';
+  let emailToSend = (userEmail || sessionUser?.email || '').trim();
+  const idToSend = (userId || sessionUser?.id || '').trim();
+
+  if (!emailToSend && idToSend) {
+    const dbUser = await prisma.user.findUnique({ where: { id: idToSend }, select: { email: true } }).catch(() => null);
+    if (dbUser?.email) emailToSend = dbUser.email.trim();
+  }
 
   try {
+    const primaryKey = serviceKey || 'konsul_sso_process';
     const headers: Record<string, string> = {
-      'x-api-key': serviceKey || 'konsul_sso_process',
+      'x-api-key': primaryKey,
       'Content-Type': 'application/json'
     };
     if (emailToSend) headers['x-user-email'] = emailToSend;
     if (idToSend) headers['x-user-id'] = idToSend;
 
+    let rawTemplates: any[] = [];
     const res = await fetch('https://process.konsul.digital/api/v1/templates', {
       method: 'GET',
       cache: 'no-store',
       headers
     });
 
-    if (!res.ok) {
-      return { success: false, error: 'Token inválido o error en Kônsul Process' };
+    if (res.ok) {
+      const data = await res.json();
+      rawTemplates = Array.isArray(data.data) ? data.data : [];
     }
 
-    const data = await res.json();
-    const rawTemplates = data.data || [];
-    
+    // Fallback al workspace del usuario vía Kônsul SSO si el token manual devolvió vacío o falló
+    if (rawTemplates.length === 0 && primaryKey !== 'konsul_sso_process' && emailToSend) {
+      const ssoRes = await fetch('https://process.konsul.digital/api/v1/templates', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          'x-api-key': 'konsul_sso_process',
+          'x-user-email': emailToSend,
+          ...(idToSend ? { 'x-user-id': idToSend } : {}),
+          'Content-Type': 'application/json'
+        }
+      });
+      if (ssoRes.ok) {
+        const ssoData = await ssoRes.json();
+        if (Array.isArray(ssoData.data) && ssoData.data.length > 0) {
+          rawTemplates = ssoData.data;
+        }
+      }
+    }
+
     // Ensure every template has execution variables including Document attachment
     const enrichedTemplates = rawTemplates.map((t: any) => {
       const vars = Array.isArray(t.variables) ? [...t.variables] : [];

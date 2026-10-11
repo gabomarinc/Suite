@@ -233,20 +233,21 @@ export default function IntegrationCard({
     return () => window.removeEventListener('konsul_rules_updated', handleRulesUpdate);
   }, []);
 
-  // Fetch Process templates
+  // Fetch Process templates (always resolves user's workspace via Kônsul SSO + email)
   useEffect(() => {
     const targetIntegration = connectedIntegrations.find(i => i.appCode === targetApp);
-    const targetServiceKey = targetIntegration?.serviceKey;
+    const targetServiceKey = targetIntegration?.serviceKey || 'konsul_sso_process';
 
-    if (targetApp === 'process' && targetServiceKey) {
+    if (targetApp === 'process') {
       setIsLoadingTemplates(true);
-      fetchProcessTemplates(targetServiceKey)
+      fetchProcessTemplates(targetServiceKey, userEmail)
         .then(res => {
           if (res.success && res.data && res.data.length > 0) {
             setProcessTemplates(res.data);
-            if (!selectedTemplateId) {
-              setSelectedTemplateId(res.data[0].id);
-            }
+            setSelectedTemplateId(prev => {
+              if (prev && res.data.some((t: any) => t.id === prev)) return prev;
+              return res.data[0].id;
+            });
           } else {
             setProcessTemplates([]);
           }
@@ -261,7 +262,7 @@ export default function IntegrationCard({
     } else {
       setProcessTemplates([]);
     }
-  }, [targetApp, connectedIntegrations, isExpanded, selectedTemplateId]);
+  }, [targetApp, connectedIntegrations, isExpanded, userEmail]);
 
   const handleToggle = async () => {
     try {
@@ -518,7 +519,7 @@ export default function IntegrationCard({
 
   const handleAddRule = async (e: React.FormEvent) => {
     e.preventDefault();
-    const isProcessWithTemplates = targetApp === 'process' && processTemplates.length > 0;
+    const isProcessWithTemplates = targetApp === 'process' && processTemplates.length > 0 && !!selectedTemplateId;
     const targetAction = targetAppConfig.actions[selectedActionIdx];
     
     let actionFields: string[] = [];
@@ -774,7 +775,7 @@ export default function IntegrationCard({
   
   // Selected action metadata
   const currentTargetAppName = ALL_APPS[targetApp]?.name || targetApp;
-  const isProcessWithTemplates = targetApp === 'process' && processTemplates.length > 0;
+  const isProcessWithTemplates = targetApp === 'process' && processTemplates.length > 0 && !!selectedTemplateId;
   const currentActionName = isProcessWithTemplates
     ? (processTemplates.find(t => t.id === selectedTemplateId)?.name || 'Plantilla de Proceso')
     : (targetAppConfig.actions[selectedActionIdx]?.name || 'Acción');
@@ -1523,11 +1524,17 @@ export default function IntegrationCard({
                           <label style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.4rem', display: 'block' }}>
                             ACCIÓN A EJECUTAR EN {currentTargetAppName.toUpperCase()}
                           </label>
-                          {targetApp === 'process' && processTemplates.length > 0 ? (
+                          {targetApp === 'process' ? (
                             <select
-                              value={selectedTemplateId}
+                              value={selectedTemplateId && processTemplates.some(t => t.id === selectedTemplateId) ? `tpl:${selectedTemplateId}` : `act:${selectedActionIdx}`}
                               onChange={(e) => {
-                                setSelectedTemplateId(e.target.value);
+                                const val = e.target.value;
+                                if (val.startsWith('tpl:')) {
+                                  setSelectedTemplateId(val.replace('tpl:', ''));
+                                } else if (val.startsWith('act:')) {
+                                  setSelectedTemplateId('');
+                                  setSelectedActionIdx(parseInt(val.replace('act:', ''), 10) || 0);
+                                }
                                 setMappingValues({});
                                 setMappingTypes({});
                               }}
@@ -1543,12 +1550,23 @@ export default function IntegrationCard({
                               }}
                             >
                               {isLoadingTemplates ? (
-                                <option>Cargando plantillas de tableros desde Process...</option>
+                                <option value="">⏳ Cargando plantillas de tu workspace en Kônsul Process...</option>
+                              ) : processTemplates.length > 0 ? (
+                                <optgroup label="🚀 Ejecutar Plantilla de Proceso (Tu Workspace)">
+                                  {processTemplates.map(t => (
+                                    <option key={t.id} value={`tpl:${t.id}`}>📋 Ejecutar Plantilla: {t.name}</option>
+                                  ))}
+                                </optgroup>
                               ) : (
-                                processTemplates.map(t => (
-                                  <option key={t.id} value={t.id}>Plantilla: {t.name}</option>
-                                ))
+                                <optgroup label="🚀 Plantillas de Proceso">
+                                  <option value="" disabled>⚠️ Sin plantillas aprobadas en el workspace ({userEmail || 'tu cuenta'})</option>
+                                </optgroup>
                               )}
+                              <optgroup label="⚡ Acciones de Tablero Kanban">
+                                {targetAppConfig.actions.map((act: any, idx: number) => (
+                                  <option key={idx} value={`act:${idx}`}>{act.name}</option>
+                                ))}
+                              </optgroup>
                             </select>
                           ) : (
                             <select
@@ -1702,7 +1720,7 @@ export default function IntegrationCard({
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                       {(() => {
-                        const isProcessWithTemplates = targetApp === 'process' && processTemplates.length > 0;
+                        const isProcessWithTemplates = targetApp === 'process' && processTemplates.length > 0 && !!selectedTemplateId;
                         const targetAction = targetAppConfig.actions[selectedActionIdx];
                         
                         let activeFields: string[] = [];
