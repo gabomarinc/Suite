@@ -526,6 +526,8 @@ export default function IntegrationCard({
     if (isProcessWithTemplates) {
       const tVars = (processTemplates.find(t => t.id === selectedTemplateId)?.variables || []).filter((v: string) => v !== 'Miembro Involucrado (Email)');
       const extraProcessFields = [
+        'Cliente Asociado',
+        'Nombre de la Ejecución / Proceso',
         'ID de Referencia (Lead / Trigger ID)',
         'Teléfono del Cliente / Lead',
         'Email del Cliente / Lead'
@@ -1727,6 +1729,8 @@ export default function IntegrationCard({
                         if (isProcessWithTemplates) {
                           const tVars = (processTemplates.find(t => t.id === selectedTemplateId)?.variables || []).filter((v: string) => v !== 'Miembro Involucrado (Email)');
                           const extraProcessFields = [
+                            'Cliente Asociado',
+                            'Nombre de la Ejecución / Proceso',
                             'ID de Referencia (Lead / Trigger ID)',
                             'Teléfono del Cliente / Lead',
                             'Email del Cliente / Lead'

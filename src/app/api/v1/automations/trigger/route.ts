@@ -597,23 +597,35 @@ export async function POST(req: Request) {
         }
 
         try {
+          const clientVal = resolvedVariables['Cliente Asociado'] || resolvedVariables['Cliente'] || resolvedVariables['Nombre del Cliente'] || resolvedVariables['Nombre de Empresa'] || data['Nombre del Lead'] || data['Nombre del Cliente'] || '';
+          const executionNameVal = resolvedVariables['Nombre de la Ejecución / Proceso'] || resolvedVariables['Nombre de la Ejecución'] || resolvedVariables['Título de Tarea'] || resolvedVariables['Cliente / Nombre de la Ejecución'] || clientVal || '';
+
           const execBody = JSON.stringify({
             template_id: templateId,
             variables: {
               ...resolvedVariables,
+              client_name: clientVal,
+              client: clientVal,
+              customer_name: clientVal,
+              execution_name: executionNameVal,
+              process_name: executionNameVal,
               trigger_id: data['ID del Lead'] || data['ID de Factura / Documento'] || data['ID de Tarea'] || data['ID de Solicitud'] || data['id'] || '',
               lead_id: data['ID del Lead'] || '',
               company: resolvedVariables['Nombre de Empresa'] || data['Nombre de Empresa'] || data['Empresa'] || '',
               company_name: resolvedVariables['Nombre de Empresa'] || data['Nombre de Empresa'] || data['Empresa'] || '',
               empresa: resolvedVariables['Nombre de Empresa'] || data['Nombre de Empresa'] || data['Empresa'] || '',
-              contact_phone: data['Teléfono del Lead'] || data['Teléfono del Cliente'] || data['Teléfono'] || '',
-              contact_email: data['Email del Lead'] || data['Email del Cliente'] || data['Email'] || '',
-              contact_name: data['Nombre del Lead'] || data['Nombre del Cliente'] || ''
+              contact_phone: resolvedVariables['Teléfono del Cliente / Lead'] || data['Teléfono del Lead'] || data['Teléfono del Cliente'] || data['Teléfono'] || '',
+              contact_email: resolvedVariables['Email del Cliente / Lead'] || data['Email del Lead'] || data['Email del Cliente'] || data['Email'] || '',
+              contact_name: clientVal || data['Nombre del Lead'] || data['Nombre del Cliente'] || ''
             },
-            external_id: data['ID del Lead'] || data['ID de Factura / Documento'] || data['ID de Tarea'] || data['id'] || '',
-            customer_name: resolvedVariables['Cliente / Nombre de la Ejecución'] || data['Nombre del Lead'] || data['Nombre del Cliente'] || '',
-            customer_email: data['Email del Lead'] || data['Email del Cliente'] || '',
-            customer_phone: data['Teléfono del Lead'] || data['Teléfono del Cliente'] || ''
+            external_id: resolvedVariables['ID de Referencia (Lead / Trigger ID)'] || data['ID del Lead'] || data['ID de Factura / Documento'] || data['ID de Tarea'] || data['id'] || '',
+            name: executionNameVal,
+            title: executionNameVal,
+            client_name: clientVal,
+            client: clientVal,
+            customer_name: clientVal,
+            customer_email: resolvedVariables['Email del Cliente / Lead'] || data['Email del Lead'] || data['Email del Cliente'] || '',
+            customer_phone: resolvedVariables['Teléfono del Cliente / Lead'] || data['Teléfono del Lead'] || data['Teléfono del Cliente'] || ''
           });
 
           let response = await fetch('https://process.konsul.digital/api/v1/templates/execute', {

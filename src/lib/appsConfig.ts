@@ -263,6 +263,7 @@ export const ALL_APPS: Record<string, AppConfig> = {
         outputs: [
           'ID de Tarea',
           'Título de Tarea', 
+          'Cliente Asociado',
           'Descripción', 
           'Tablero',
           'Columna Actual',
@@ -278,6 +279,7 @@ export const ALL_APPS: Record<string, AppConfig> = {
         outputs: [
           'ID de Tarea',
           'Título de Tarea', 
+          'Cliente Asociado',
           'Columna Actual',
           'Columna Anterior',
           'Documento Adjunto (URL)'
@@ -290,6 +292,7 @@ export const ALL_APPS: Record<string, AppConfig> = {
         description: 'Crea una tarea en un tablero y columna específica.', 
         fields: [
           'Título de Tarea', 
+          'Cliente Asociado',
           'Descripción', 
           'Documento Adjunto (URL)',
           'Email de Miembro',

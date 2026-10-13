@@ -722,9 +722,11 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
         const tasks = Array.isArray(json) ? json : (json.data || json.tasks || []);
         if (tasks.length > 0) {
           const t = tasks[0];
+          const clientName = t.client?.name || t.client_name || t.customer_name || t.customerName || t.client || 'Cliente Corporativo';
           const data: Record<string, string> = {
             'ID de Tarea': String(t.id || t.code || 'task_real_1'),
             'Título de Tarea': t.title || t.name || 'Tarea Operativa',
+            'Cliente Asociado': clientName,
             'Descripción': t.description || 'Tarea registrada en Process',
             'Estado de Tarea': t.status || 'Completada',
             'Tablero / Flujo': t.board?.name || 'Flujo Comercial',
@@ -753,6 +755,7 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
       data: {
         'ID de Tarea': 'task_manual_88',
         'Título de Tarea': 'Implementación de Cliente Onboarding',
+        'Cliente Asociado': 'Kônsul Digital Solutions',
         'Descripción': 'Configuración de cuenta y flujos automáticos',
         'Estado de Tarea': 'En Progreso',
         'Tablero / Flujo': 'Operaciones Clientes',
