@@ -1343,6 +1343,30 @@ export async function retryAutomationLog(logId: string) {
     };
   }
 
+  if (!targetIntegration && log.targetApp === 'process') {
+    targetIntegration = {
+      id: 'auto_process_' + user.id,
+      userId: user.id,
+      appCode: log.targetApp,
+      serviceKey: 'konsul_sso_process',
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+  }
+
+  if (!targetIntegration && log.targetApp === 'leadshub') {
+    targetIntegration = {
+      id: 'auto_leadshub_' + user.id,
+      userId: user.id,
+      appCode: log.targetApp,
+      serviceKey: 'konsul_sso_leadshub',
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+  }
+
   if (!targetIntegration || !targetIntegration.isActive || !targetIntegration.serviceKey) {
     throw new Error(`La integración destino ${log.targetApp} no está activa o le falta la API Key`);
   }
@@ -1363,23 +1387,81 @@ export async function retryAutomationLog(logId: string) {
     }
 
     // Clean payload of __templateId for the variables field
-    const variablesToSend = { ...(log.payloadSent as Record<string, string>) };
+    const rawPayload = (log.payloadSent as Record<string, string>) || {};
+    const variablesToSend = { ...rawPayload };
     delete variablesToSend['__templateId'];
 
+    const clientVal = variablesToSend['Cliente Asociado'] || variablesToSend['Cliente'] || variablesToSend['Nombre del Cliente'] || variablesToSend['Nombre de Empresa'] || '';
+    const executionNameVal = variablesToSend['Nombre de la Ejecución / Proceso'] || variablesToSend['Nombre de la Ejecución'] || variablesToSend['Título de Tarea'] || variablesToSend['Cliente / Nombre de la Ejecución'] || clientVal || '';
+    const clientEmailVal = variablesToSend['Email del Cliente / Lead'] || variablesToSend['Email del Cliente'] || variablesToSend['Email del Lead'] || variablesToSend['Email'] || variablesToSend['email'] || '';
+    const clientPhoneVal = variablesToSend['Teléfono del Cliente / Lead'] || variablesToSend['Teléfono del Cliente'] || variablesToSend['Teléfono del Lead'] || variablesToSend['Teléfono'] || variablesToSend['phone'] || '';
+
+    const execBody = JSON.stringify({
+      template_id: templateId,
+      variables: {
+        ...variablesToSend,
+        client_name: clientVal,
+        client: clientVal,
+        customer_name: clientVal,
+        execution_name: executionNameVal,
+        process_name: executionNameVal,
+        client_email: clientEmailVal,
+        customer_email: clientEmailVal,
+        contact_email: clientEmailVal,
+        email: clientEmailVal,
+        client_phone: clientPhoneVal,
+        contact_phone: clientPhoneVal,
+        company: variablesToSend['Nombre de Empresa'] || '',
+        company_name: variablesToSend['Nombre de Empresa'] || '',
+        empresa: variablesToSend['Nombre de Empresa'] || '',
+        contact_name: clientVal || ''
+      },
+      external_id: variablesToSend['ID de Referencia (Lead / Trigger ID)'] || '',
+      name: executionNameVal,
+      title: executionNameVal,
+      client_name: clientVal,
+      client: clientVal,
+      customer_name: clientVal,
+      client_email: clientEmailVal,
+      customer_email: clientEmailVal,
+      email: clientEmailVal,
+      customer_phone: clientPhoneVal,
+      client_phone: clientPhoneVal
+    });
+
+    const userEmail = (user.email || '').trim();
+    const userName = (user.given_name ? `${user.given_name} ${user.family_name || ''}`.trim() : (userEmail || 'Usuario')).trim();
+
     try {
-      const response = await fetch('https://process.konsul.digital/api/v1/templates/execute', {
+      let response = await fetch('https://process.konsul.digital/api/v1/templates/execute', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': targetIntegration.serviceKey
+          'x-api-key': targetIntegration.serviceKey || 'konsul_sso_process',
+          'x-user-id': user.id,
+          'x-user-email': userEmail,
+          'x-user-name': userName
         },
-        body: JSON.stringify({
-          template_id: templateId,
-          variables: variablesToSend
-        })
+        body: execBody
       });
 
-      const resData = await response.json();
+      let resData = await response.json().catch(() => ({}));
+
+      // Fallback a SSO si la clave particular falló o no resolvió la organización
+      if ((!response.ok || !resData.success) && targetIntegration.serviceKey !== 'konsul_sso_process' && userEmail) {
+        response = await fetch('https://process.konsul.digital/api/v1/templates/execute', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': 'konsul_sso_process',
+            'x-user-id': user.id,
+            'x-user-email': userEmail,
+            'x-user-name': userName
+          },
+          body: execBody
+        });
+        resData = await response.json().catch(() => ({}));
+      }
 
       if (response.ok && resData.success) {
         // Create a new log for the retry
