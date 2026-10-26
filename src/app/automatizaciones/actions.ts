@@ -333,6 +333,58 @@ export async function testIntegration(appCode: string, serviceKey: string) {
       } catch (e: any) {
         logs.push(`Aviso al consultar LeadsHUB: ${e.message}`);
       }
+    } else if (appCode === 'mailing') {
+      const mailingUrl = process.env.NEXT_PUBLIC_MAILING_URL || 'https://mailing.konsul.digital';
+      const { isAuthenticated, getUser } = getKindeServerSession();
+      const isAuth = await isAuthenticated();
+      const sessionUser = isAuth ? await getUser() : null;
+
+      const authHeaders: Record<string, string> = {
+        'x-api-key': serviceKey || 'konsul_sso_mailing',
+        'Content-Type': 'application/json'
+      };
+      if (sessionUser?.id) authHeaders['x-user-id'] = sessionUser.id;
+      if (sessionUser?.email) authHeaders['x-user-email'] = sessionUser.email;
+
+      const healthRes = await fetch(`${mailingUrl}/api/v1/health`, { cache: 'no-store' }).catch(() => null);
+      if (healthRes && healthRes.ok) {
+        logs.push(`[GET] ${mailingUrl}/api/v1/health -> 200 OK (Servicio de Mailing En Línea)`);
+      }
+
+      // Consultar listas reales de Mailing
+      try {
+        const listsRes = await fetch(`${mailingUrl}/api/v1/lists`, {
+          headers: authHeaders,
+          cache: 'no-store'
+        });
+        if (listsRes.ok) {
+          const listsJson = await listsRes.json();
+          const realLists = Array.isArray(listsJson.data) ? listsJson.data : (Array.isArray(listsJson) ? listsJson : []);
+          if (realLists.length > 0) {
+            const listNames = realLists.map((l: any) => l.name || l).slice(0, 5).join(', ');
+            logs.push(`[DATOS REALES] Encontradas ${realLists.length} listas de audiencia activas: ${listNames}${realLists.length > 5 ? '...' : ''}`);
+          } else {
+            logs.push(`[DATOS REALES] Conexión validada con Mailing (Aún no tienes listas creadas; se crearán automáticamente al sincronizar).`);
+          }
+        } else {
+          logs.push(`[GET] ${mailingUrl}/api/v1/lists -> HTTP ${listsRes.status}`);
+        }
+
+        // Consultar formularios reales de Mailing
+        const formsRes = await fetch(`${mailingUrl}/api/v1/forms`, {
+          headers: authHeaders,
+          cache: 'no-store'
+        });
+        if (formsRes.ok) {
+          const formsJson = await formsRes.json();
+          const realForms = Array.isArray(formsJson.data) ? formsJson.data : [];
+          if (realForms.length > 0) {
+            logs.push(`[DATOS REALES] Encontrados ${realForms.length} formularios de captación y autorespondedores.`);
+          }
+        }
+      } catch (e: any) {
+        logs.push(`Aviso al consultar listas de Mailing: ${e.message}`);
+      }
     } else if (appCode === 'kredit') {
       logs.push(`Kredit API v1 operativa y lista para procesar evaluaciones y solicitudes de riesgo.`);
     }
@@ -1233,6 +1285,140 @@ export async function fetchProcessTemplates(serviceKey: string, userEmail?: stri
   } catch (error) {
     console.error("Error fetching templates:", error);
     return { success: false, error: 'Error de red o CORS al contactar Process' };
+  }
+}
+
+export async function fetchMailingLists(serviceKey?: string, userEmail?: string | null, userId?: string | null) {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  if (!isAuth) throw new Error("No autenticado");
+
+  const sessionUser = await getUser().catch(() => null);
+  const emailToSend = (userEmail || sessionUser?.email || '').trim();
+  const idToSend = (userId || sessionUser?.id || '').trim();
+
+  const mailingUrl = process.env.NEXT_PUBLIC_MAILING_URL || 'https://mailing.konsul.digital';
+  const primaryKey = serviceKey || 'konsul_sso_mailing';
+
+  const headers: Record<string, string> = {
+    'x-api-key': primaryKey,
+    'Content-Type': 'application/json'
+  };
+  if (emailToSend) headers['x-user-email'] = emailToSend;
+  if (idToSend) headers['x-user-id'] = idToSend;
+
+  try {
+    const res = await fetch(`${mailingUrl}/api/v1/lists`, {
+      method: 'GET',
+      cache: 'no-store',
+      headers
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      const rawLists = Array.isArray(json.data) ? json.data : (Array.isArray(json) ? json : []);
+      return { success: true, data: rawLists };
+    }
+
+    // Fallback con SSO si la clave personalizada devolvió error o no tiene permisos
+    if (primaryKey !== 'konsul_sso_mailing' && emailToSend) {
+      const ssoRes = await fetch(`${mailingUrl}/api/v1/lists`, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          'x-api-key': 'konsul_sso_mailing',
+          'x-user-email': emailToSend,
+          ...(idToSend ? { 'x-user-id': idToSend } : {}),
+          'Content-Type': 'application/json'
+        }
+      });
+      if (ssoRes.ok) {
+        const ssoJson = await ssoRes.json();
+        const ssoLists = Array.isArray(ssoJson.data) ? ssoJson.data : (Array.isArray(ssoJson) ? ssoJson : []);
+        return { success: true, data: ssoLists };
+      }
+    }
+
+    return { success: false, data: [], error: `HTTP ${res.status}` };
+  } catch (error: any) {
+    console.error("Error fetching mailing lists:", error);
+    return { success: false, data: [], error: error.message };
+  }
+}
+
+export async function fetchMailingForms(serviceKey?: string, userEmail?: string | null, userId?: string | null) {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  if (!isAuth) throw new Error("No autenticado");
+
+  const sessionUser = await getUser().catch(() => null);
+  const emailToSend = (userEmail || sessionUser?.email || '').trim();
+  const idToSend = (userId || sessionUser?.id || '').trim();
+
+  const mailingUrl = process.env.NEXT_PUBLIC_MAILING_URL || 'https://mailing.konsul.digital';
+  const primaryKey = serviceKey || 'konsul_sso_mailing';
+
+  const headers: Record<string, string> = {
+    'x-api-key': primaryKey,
+    'Content-Type': 'application/json'
+  };
+  if (emailToSend) headers['x-user-email'] = emailToSend;
+  if (idToSend) headers['x-user-id'] = idToSend;
+
+  try {
+    const res = await fetch(`${mailingUrl}/api/v1/forms`, {
+      method: 'GET',
+      cache: 'no-store',
+      headers
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      const rawForms = Array.isArray(json.data) ? json.data : [];
+      return { success: true, data: rawForms };
+    }
+    return { success: false, data: [] };
+  } catch (error: any) {
+    console.error("Error fetching mailing forms:", error);
+    return { success: false, data: [] };
+  }
+}
+
+export async function fetchMailingTemplates(serviceKey?: string, userEmail?: string | null, userId?: string | null) {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  if (!isAuth) throw new Error("No autenticado");
+
+  const sessionUser = await getUser().catch(() => null);
+  const emailToSend = (userEmail || sessionUser?.email || '').trim();
+  const idToSend = (userId || sessionUser?.id || '').trim();
+
+  const mailingUrl = process.env.NEXT_PUBLIC_MAILING_URL || 'https://mailing.konsul.digital';
+  const primaryKey = serviceKey || 'konsul_sso_mailing';
+
+  const headers: Record<string, string> = {
+    'x-api-key': primaryKey,
+    'Content-Type': 'application/json'
+  };
+  if (emailToSend) headers['x-user-email'] = emailToSend;
+  if (idToSend) headers['x-user-id'] = idToSend;
+
+  try {
+    const res = await fetch(`${mailingUrl}/api/v1/templates`, {
+      method: 'GET',
+      cache: 'no-store',
+      headers
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      const raw = Array.isArray(json.data) ? json.data : [];
+      return { success: true, data: raw };
+    }
+    return { success: false, data: [] };
+  } catch (error: any) {
+    console.error("Error fetching mailing templates:", error);
+    return { success: false, data: [] };
   }
 }
 

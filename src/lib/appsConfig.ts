@@ -571,16 +571,40 @@ export const ALL_APPS: Record<string, AppConfig> = {
     ],
     actions: [
       { 
-        name: 'Enviar Correo Transaccional', 
-        description: 'Envía un email directo usando una plantilla.', 
-        fields: ['Email Destinatario', 'Asunto del Correo', 'Cuerpo del Correo', 'Documento Adjunto (URL)'],
+        name: 'Añadir a Lista de Envío', 
+        description: 'Registra o actualiza un contacto en una lista de audiencia real de Mailing, sincronizando nombre, etiquetas y campos personalizados.', 
+        fields: ['Email del Suscriptor', 'Nombre del Suscriptor', 'Lista de Mailing', 'Etiquetas Adicionales', 'Teléfono', 'Empresa'],
+        requiredFields: ['Email del Suscriptor', 'Lista de Mailing']
+      },
+      { 
+        name: 'Añadir Etiquetas a Contacto', 
+        description: 'Añade una o más etiquetas (tags) de segmentación a un contacto existente en Mailing (ej. cuando califica o gana un trato).', 
+        fields: ['Email del Suscriptor', 'Etiqueta a Añadir'],
+        requiredFields: ['Email del Suscriptor', 'Etiqueta a Añadir']
+      },
+      { 
+        name: 'Remover Etiqueta de Contacto', 
+        description: 'Quita una etiqueta específica de un contacto en Mailing.', 
+        fields: ['Email del Suscriptor', 'Etiqueta a Remover'],
+        requiredFields: ['Email del Suscriptor', 'Etiqueta a Remover']
+      },
+      { 
+        name: 'Desuscribir Contacto (Baja)', 
+        description: 'Marca al suscriptor como desuscrito en Mailing para pausar futuros envíos de campañas.', 
+        fields: ['Email del Suscriptor'],
+        requiredFields: ['Email del Suscriptor']
+      },
+      { 
+        name: 'Enviar Correo Transaccional Directo', 
+        description: 'Envía un email directo individual con asunto y cuerpo personalizados al instante.', 
+        fields: ['Email Destinatario', 'Asunto del Correo', 'Cuerpo del Correo', 'Nombre del Remitente'],
         requiredFields: ['Email Destinatario', 'Asunto del Correo', 'Cuerpo del Correo']
       },
       { 
-        name: 'Añadir a Lista de Envío', 
-        description: 'Suscribe a un usuario a una campaña o newsletter.', 
-        fields: ['Email del Suscriptor', 'Nombre del Suscriptor', 'Lista'],
-        requiredFields: ['Email del Suscriptor', 'Lista']
+        name: 'Enviar a Formulario con Autorespondedor', 
+        description: 'Envía los datos a un formulario de captación de Mailing para disparar su email de bienvenida o autoresponder configurado.', 
+        fields: ['Formulario de Mailing', 'Email del Suscriptor', 'Nombre del Suscriptor', 'Teléfono', 'Empresa'],
+        requiredFields: ['Formulario de Mailing', 'Email del Suscriptor']
       }
     ]
   },

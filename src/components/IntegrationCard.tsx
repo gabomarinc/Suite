@@ -11,6 +11,9 @@ import {
   toggleAutomationRule,
   getAutomationRules,
   fetchProcessTemplates,
+  fetchMailingLists,
+  fetchMailingForms,
+  fetchMailingTemplates,
   getConnectedIntegrations,
   connectAppOneClick,
   disconnectApp,
@@ -116,6 +119,13 @@ export default function IntegrationCard({
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [connectedIntegrations, setConnectedIntegrations] = useState<any[]>([]);
+  
+  // Dynamic Mailing Lists & Forms State
+  const [mailingLists, setMailingLists] = useState<any[]>([]);
+  const [isLoadingMailingLists, setIsLoadingMailingLists] = useState(false);
+  const [mailingForms, setMailingForms] = useState<any[]>([]);
+  const [isLoadingMailingForms, setIsLoadingMailingForms] = useState(false);
+  const [customListInputActive, setCustomListInputActive] = useState(false);
   
   // Field Mappings
   const [mappingValues, setMappingValues] = useState<Record<string, string>>({});
@@ -261,6 +271,51 @@ export default function IntegrationCard({
         });
     } else {
       setProcessTemplates([]);
+    }
+  }, [targetApp, connectedIntegrations, isExpanded, userEmail]);
+
+  // Fetch Mailing Lists & Forms (resolves user's real account via Kônsul SSO + email)
+  useEffect(() => {
+    const targetIntegration = connectedIntegrations.find(i => i.appCode === targetApp);
+    const targetServiceKey = targetIntegration?.serviceKey || 'konsul_sso_mailing';
+
+    if (targetApp === 'mailing') {
+      setIsLoadingMailingLists(true);
+      fetchMailingLists(targetServiceKey, userEmail)
+        .then(res => {
+          if (res.success && Array.isArray(res.data)) {
+            setMailingLists(res.data);
+          } else {
+            setMailingLists([]);
+          }
+        })
+        .catch(err => {
+          console.error('[fetchMailingLists error]', err);
+          setMailingLists([]);
+        })
+        .finally(() => {
+          setIsLoadingMailingLists(false);
+        });
+
+      setIsLoadingMailingForms(true);
+      fetchMailingForms(targetServiceKey, userEmail)
+        .then(res => {
+          if (res.success && Array.isArray(res.data)) {
+            setMailingForms(res.data);
+          } else {
+            setMailingForms([]);
+          }
+        })
+        .catch(err => {
+          console.error('[fetchMailingForms error]', err);
+          setMailingForms([]);
+        })
+        .finally(() => {
+          setIsLoadingMailingForms(false);
+        });
+    } else {
+      setMailingLists([]);
+      setMailingForms([]);
     }
   }, [targetApp, connectedIntegrations, isExpanded, userEmail]);
 
@@ -1832,20 +1887,142 @@ export default function IntegrationCard({
                                   })}
                                 </select>
                               ) : (
-                                <input
-                                  type="text"
-                                  required={isRequired}
-                                  placeholder={isRequired ? "Escribe el valor fijo (Obligatorio)" : "Valor fijo (Opcional)"}
-                                  value={mappingValues[field] || ''}
-                                  onChange={(e) => setMappingValues({ ...mappingValues, [field]: e.target.value })}
-                                  style={{
-                                    padding: '0.45rem 0.6rem',
-                                    fontSize: '0.78rem',
-                                    border: isRequired && !mappingValues[field] ? '1px solid #f87171' : '1px solid #cbd5e1',
-                                    borderRadius: '8px',
-                                    background: '#ffffff'
-                                  }}
-                                />
+                                targetApp === 'mailing' && (field === 'Lista de Mailing' || field === 'Lista') ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                    {isLoadingMailingLists ? (
+                                      <div style={{ fontSize: '0.75rem', color: '#64748b', padding: '0.4rem', background: '#f1f5f9', borderRadius: '6px' }}>
+                                        ⏳ Consultando listas reales de tu cuenta de Mailing...
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <select
+                                          required={isRequired && !customListInputActive}
+                                          value={customListInputActive ? '__custom__' : (mappingValues[field] || '')}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === '__custom__') {
+                                              setCustomListInputActive(true);
+                                              setMappingValues({ ...mappingValues, [field]: '' });
+                                            } else {
+                                              setCustomListInputActive(false);
+                                              setMappingValues({ ...mappingValues, [field]: val });
+                                            }
+                                          }}
+                                          style={{
+                                            padding: '0.45rem 0.6rem',
+                                            fontSize: '0.78rem',
+                                            fontWeight: 600,
+                                            border: isRequired && !mappingValues[field] ? '1px solid #f87171' : '1px solid #cbd5e1',
+                                            borderRadius: '8px',
+                                            background: '#ffffff',
+                                            color: '#0f172a'
+                                          }}
+                                        >
+                                          <option value="">-- Seleccionar Lista Real de Mailing --</option>
+                                          {mailingLists.map((l: any) => (
+                                            <option key={l.name} value={l.name}>
+                                              📁 {l.name} ({l.subscriber_count ?? 0} contactos)
+                                            </option>
+                                          ))}
+                                          <option value="__custom__">➕ Crear / Escribir lista nueva...</option>
+                                        </select>
+
+                                        {(customListInputActive || (mappingValues[field] && !mailingLists.some((l: any) => l.name === mappingValues[field]))) && (
+                                          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                                            <input
+                                              type="text"
+                                              required={isRequired}
+                                              placeholder="Escribe el nombre de la lista nueva..."
+                                              value={mappingValues[field] || ''}
+                                              onChange={(e) => setMappingValues({ ...mappingValues, [field]: e.target.value })}
+                                              style={{
+                                                flex: 1,
+                                                padding: '0.45rem 0.6rem',
+                                                fontSize: '0.78rem',
+                                                border: '1px solid #0d9488',
+                                                borderRadius: '8px',
+                                                background: '#f0fdfa'
+                                              }}
+                                            />
+                                            {mailingLists.length > 0 && (
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setCustomListInputActive(false);
+                                                  setMappingValues({ ...mappingValues, [field]: mailingLists[0]?.name || '' });
+                                                }}
+                                                style={{
+                                                  fontSize: '0.7rem',
+                                                  color: '#64748b',
+                                                  background: 'none',
+                                                  border: 'none',
+                                                  cursor: 'pointer',
+                                                  textDecoration: 'underline'
+                                                }}
+                                              >
+                                                Ver existentes
+                                              </button>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        <span style={{ fontSize: '0.68rem', color: '#0d9488', fontWeight: 600 }}>
+                                          ✓ {mailingLists.length} {mailingLists.length === 1 ? 'lista real sincronizada' : 'listas reales sincronizadas'} desde tu app de Mailing
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                ) : targetApp === 'mailing' && (field === 'Formulario de Mailing' || field === 'Formulario') ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                    {isLoadingMailingForms ? (
+                                      <div style={{ fontSize: '0.75rem', color: '#64748b', padding: '0.4rem', background: '#f1f5f9', borderRadius: '6px' }}>
+                                        ⏳ Consultando formularios de Mailing...
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <select
+                                          required={isRequired}
+                                          value={mappingValues[field] || ''}
+                                          onChange={(e) => setMappingValues({ ...mappingValues, [field]: e.target.value })}
+                                          style={{
+                                            padding: '0.45rem 0.6rem',
+                                            fontSize: '0.78rem',
+                                            fontWeight: 600,
+                                            border: isRequired && !mappingValues[field] ? '1px solid #f87171' : '1px solid #cbd5e1',
+                                            borderRadius: '8px',
+                                            background: '#ffffff',
+                                            color: '#0f172a'
+                                          }}
+                                        >
+                                          <option value="">-- Seleccionar Formulario de Mailing --</option>
+                                          {mailingForms.map((f: any) => (
+                                            <option key={f.id} value={f.id}>
+                                              📝 {f.name} {f.autoresponder_enabled ? '✦ Con Autoresponder' : ''} (Tag: {f.target_tag || 'General'})
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <span style={{ fontSize: '0.68rem', color: '#0d9488', fontWeight: 600 }}>
+                                          ✓ Al sincronizar se disparará el autoresponder y tag asociado al formulario
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    required={isRequired}
+                                    placeholder={isRequired ? "Escribe el valor fijo (Obligatorio)" : "Valor fijo (Opcional)"}
+                                    value={mappingValues[field] || ''}
+                                    onChange={(e) => setMappingValues({ ...mappingValues, [field]: e.target.value })}
+                                    style={{
+                                      padding: '0.45rem 0.6rem',
+                                      fontSize: '0.78rem',
+                                      border: isRequired && !mappingValues[field] ? '1px solid #f87171' : '1px solid #cbd5e1',
+                                      borderRadius: '8px',
+                                      background: '#ffffff'
+                                    }}
+                                  />
+                                )
                               )}
                             </div>
                           );

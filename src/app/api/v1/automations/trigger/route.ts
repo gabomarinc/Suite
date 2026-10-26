@@ -885,26 +885,77 @@ export async function POST(req: Request) {
         let endpoint = `${mailingUrl}/api/v1/send`;
         let payload: any = {};
 
-        if (actionName === 'Añadir a Lista de Envío') {
+        const email = resolvedVariables['Email del Suscriptor'] || resolvedVariables['Email del Cliente'] || resolvedVariables['Email del Lead'] || resolvedVariables['Email Destinatario'] || resolvedVariables['email'] || '';
+        const name = resolvedVariables['Nombre del Suscriptor'] || resolvedVariables['Nombre del Cliente'] || resolvedVariables['Nombre del Lead'] || resolvedVariables['name'] || '';
+        const phone = resolvedVariables['Teléfono'] || resolvedVariables['Teléfono del Lead'] || resolvedVariables['Teléfono del Cliente'] || '';
+        const company = resolvedVariables['Empresa'] || resolvedVariables['Nombre de Empresa'] || '';
+
+        if (actionName.includes('Lista de Envío') || actionName.includes('Suscriptor')) {
           endpoint = `${mailingUrl}/api/v1/subscribers`;
-          const email = resolvedVariables['Email del Suscriptor'] || resolvedVariables['Email del Cliente'] || resolvedVariables['Email del Lead'] || resolvedVariables['email'] || '';
-          const name = resolvedVariables['Nombre del Suscriptor'] || resolvedVariables['Nombre del Cliente'] || resolvedVariables['Nombre del Lead'] || resolvedVariables['name'] || '';
+          const listName = resolvedVariables['Lista de Mailing'] || resolvedVariables['Lista'] || 'Clientes Kônsul';
+          const extraTagsRaw = resolvedVariables['Etiquetas Adicionales'] || resolvedVariables['Etiquetas del Lead'] || '';
+          const extraTags = extraTagsRaw ? extraTagsRaw.split(',').map((t: string) => t.trim()).filter(Boolean) : [];
+
           payload = {
             email,
             name,
-            tags: ['Kônsul Suite', appCode],
-            listName: 'Clientes Kônsul',
+            tags: Array.from(new Set(['Kônsul Suite', appCode, ...extraTags])),
+            listName,
+            customFields: {
+              ...(phone ? { phone } : {}),
+              ...(company ? { company } : {})
+            },
+            userId: rule.userId
+          };
+        } else if (actionName.includes('Añadir Etiquetas')) {
+          endpoint = `${mailingUrl}/api/v1/subscribers/tags`;
+          const tagToAdd = resolvedVariables['Etiqueta a Añadir'] || resolvedVariables['Etiquetas Nuevas Añadidas'] || '';
+          const tagsArray = tagToAdd ? tagToAdd.split(',').map((t: string) => t.trim()).filter(Boolean) : [];
+          payload = {
+            email,
+            addTags: tagsArray,
+            userId: rule.userId
+          };
+        } else if (actionName.includes('Remover Etiqueta')) {
+          endpoint = `${mailingUrl}/api/v1/subscribers/tags`;
+          const tagToRemove = resolvedVariables['Etiqueta a Remover'] || '';
+          const tagsArray = tagToRemove ? tagToRemove.split(',').map((t: string) => t.trim()).filter(Boolean) : [];
+          payload = {
+            email,
+            removeTags: tagsArray,
+            userId: rule.userId
+          };
+        } else if (actionName.includes('Desuscribir')) {
+          endpoint = `${mailingUrl}/api/v1/subscribers/status`;
+          payload = {
+            email,
+            status: 'unsubscribe',
+            userId: rule.userId
+          };
+        } else if (actionName.includes('Formulario')) {
+          const formId = resolvedVariables['Formulario de Mailing'] || resolvedVariables['Formulario'] || '';
+          endpoint = `${mailingUrl}/api/v1/forms/${formId}/submit`;
+          payload = {
+            email,
+            name,
+            data: {
+              ...(phone ? { phone } : {}),
+              ...(company ? { company } : {}),
+              origen: appCode
+            },
             userId: rule.userId
           };
         } else {
           endpoint = `${mailingUrl}/api/v1/send`;
-          const to = resolvedVariables['Email Destinatario'] || resolvedVariables['Email del Cliente'] || resolvedVariables['Email del Lead'] || resolvedVariables['email'] || '';
+          const to = email;
           const subject = resolvedVariables['Asunto del Correo'] || `Notificación de Kônsul (${triggerName})`;
-          const body = resolvedVariables['Cuerpo del Correo'] || `Hola ${resolvedVariables['Nombre del Cliente'] || ''},\n\nTe informamos que se ha procesado tu evento en Kônsul Suite.`;
+          const body = resolvedVariables['Cuerpo del Correo'] || `Hola ${name || ''},\n\nTe informamos que se ha procesado tu evento en Kônsul Suite.`;
+          const senderName = resolvedVariables['Nombre del Remitente'] || 'Kônsul Suite';
           payload = {
             to,
             subject,
             body,
+            senderName,
             userId: rule.userId
           };
         }
