@@ -39,3 +39,16 @@ export async function updateUserProfile(formData: FormData) {
     throw new Error("No se pudo actualizar el perfil");
   }
 }
+
+export async function handleRegenerateSuiteApiKey() {
+  const { isAuthenticated, getUser } = getKindeServerSession();
+  const isAuth = await isAuthenticated();
+  if (!isAuth) throw new Error("No autenticado");
+  const user = await getUser();
+  if (!user?.id) throw new Error("Usuario no encontrado en Kinde");
+
+  const { regenerateSuiteApiKey } = await import("@/lib/hubAuth");
+  const newKey = await regenerateSuiteApiKey(user.id);
+  revalidatePath('/ajustes');
+  return { success: true, apiKey: newKey };
+}

@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { updateUserProfile } from "./actions";
 import ManageSubscriptionButton from "./ManageSubscriptionButton";
+import { getOrCreateSuiteApiKey } from "@/lib/hubAuth";
+import SuiteApiKeyManager from "@/components/SuiteApiKeyManager";
 
 export default async function AjustesPage() {
   const { isAuthenticated, getUser } = getKindeServerSession();
@@ -37,6 +39,18 @@ export default async function AjustesPage() {
   }
 
   const roleDisplay = dbUser.role === 'ADMIN' ? 'MANAGER' : 'PRO MEMBER';
+
+  // Obtener Suite API Key para bots externos (GrokBot, etc.) y verificar LeadsHUB
+  const suiteApiKey = await getOrCreateSuiteApiKey(dbUser.id);
+  const leadshubInteg = await prisma.integration.findUnique({
+    where: {
+      userId_appCode: {
+        userId: dbUser.id,
+        appCode: 'leadshub'
+      }
+    }
+  });
+  const isLeadshubConnected = !!(leadshubInteg && leadshubInteg.isActive && leadshubInteg.serviceKey);
 
   return (
     <main className="main-content">
@@ -177,6 +191,12 @@ export default async function AjustesPage() {
               </div>
             </div>
           </div>
+
+          {/* Card 3: API Key Maestra para GrokBot y Agentes Externos */}
+          <SuiteApiKeyManager 
+            initialApiKey={suiteApiKey} 
+            isLeadshubConnected={isLeadshubConnected} 
+          />
 
         </div>
 
