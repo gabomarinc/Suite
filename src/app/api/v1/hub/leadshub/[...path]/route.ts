@@ -86,10 +86,34 @@ async function handleProxy(req: Request, { params }: { params: Promise<{ path: s
     proxyStatus = lhResponse.status;
     const textData = await lhResponse.text();
 
+    if (textData.trim().startsWith('<') || proxyStatus === 404) {
+      return NextResponse.json({
+        success: false,
+        hub: 'Kônsul Suite API Gateway',
+        app: 'leadshub',
+        error: {
+          code: 'NOT_FOUND',
+          message: `El recurso '/${targetPath}' no existe en la API de LeadsHUB. Los recursos disponibles son: /contacts (contactos y prospectos), /calendar/events (citas) y /messages/send (mensajería).`
+        }
+      }, { status: 404, headers: CORS_HEADERS });
+    }
+
     try {
       responseData = JSON.parse(textData);
     } catch {
-      responseData = { rawResponse: textData };
+      responseData = { message: textData };
+    }
+
+    if (proxyStatus === 401) {
+      return NextResponse.json({
+        success: false,
+        hub: 'Kônsul Suite API Gateway',
+        app: 'leadshub',
+        error: {
+          code: 'LEADSHUB_AUTHENTICATION_FAILED',
+          message: 'LeadsHUB respondió 401 No Autorizado. Tu workspace en Suite tiene configurada una clave genérica o pendiente. Ve a Kônsul Suite -> Automatizaciones -> Tarjeta de LeadsHUB y asegúrate de guardar tu API Key real de LeadsHUB (lh_live_...).'
+        }
+      }, { status: 401, headers: CORS_HEADERS });
     }
 
     // Registrar en auditoría de automatizaciones de Suite

@@ -118,16 +118,6 @@ export async function GET(req: Request) {
           }
         }
       },
-      "/api/v1/hub/leadshub/conversations": {
-        get: {
-          operationId: "getConversations",
-          summary: "Consultar conversaciones de chat y WhatsApp",
-          description: "Obtiene las conversaciones activas o cerradas registradas en LeadsHUB.",
-          responses: {
-            "200": { description: "Lista de conversaciones" }
-          }
-        }
-      },
       "/api/v1/hub/leadshub/messages/send": {
         post: {
           operationId: "sendProactiveMessage",

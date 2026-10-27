@@ -63,11 +63,6 @@ export async function GET(req: Request) {
       },
       {
         method: 'GET',
-        path: '/api/v1/hub/leadshub/conversations',
-        description: 'Listar conversaciones y chats de WhatsApp/canales'
-      },
-      {
-        method: 'GET',
         path: '/api/v1/hub/leadshub/calendar/events',
         description: 'Listar citas agendadas y reuniones en el calendario'
       },
