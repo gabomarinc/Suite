@@ -4,6 +4,7 @@ import { ALL_APPS } from '@/lib/appsConfig';
 import { Prisma } from '@prisma/client';
 import * as qbo from '@/lib/quickbooks';
 import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
+import { buildLeadsHubHeaders } from '@/lib/leadshubHeaders';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -1134,25 +1135,30 @@ export async function POST(req: Request) {
           };
         }
 
-        // Prepare headers according to Section 03 of LeadsHUB Contract
+        // Prepare headers according to Section 03 of LeadsHUB Contract + Origin Identification Spec
         const rawKey = targetIntegration.serviceKey || sharedSecret;
         const isLiveApiKey = rawKey.startsWith('lh_') || rawKey.startsWith('kp_');
         const apiKey = isLiveApiKey ? rawKey : sharedSecret;
         const workspaceId = (!isLiveApiKey && rawKey !== sharedSecret && rawKey.length > 5) ? rawKey : undefined;
 
-        const lhHeaders: Record<string, string> = {
+        const actorEmail = (rawBody.actorEmail || rawBody.performedByEmail || headers.get('x-konsul-actor-email') || null);
+
+        const lhHeaders = buildLeadsHubHeaders({
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
           'x-user-id': rule.userId,
-          'x-user-email': userEmail,
-          'x-user-name': userName
-        };
-
-        if (workspaceId) {
-          lhHeaders['x-workspace-id'] = workspaceId;
-        }
-        lhHeaders['x-konsul-trace-id'] = traceId;
-        lhHeaders['x-konsul-depth'] = String(incomingDepth + 1);
+          'x-user-email': userEmail, // Mantenemos para resolución de workspace según instrucción
+          'x-user-name': userName,
+          ...(workspaceId ? { 'x-workspace-id': workspaceId } : {}),
+          'x-konsul-trace-id': traceId,
+          'x-konsul-depth': String(incomingDepth + 1)
+        }, {
+          source: 'automation',
+          sourceId: rule.id,
+          sourceName: actionName || triggerName || 'Automatización Suite',
+          actorEmail: actorEmail, // Vacío si fue automático
+          requestId: traceId
+        });
 
         if (isDryRun) {
           const simRes = {

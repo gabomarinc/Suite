@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { ALL_APPS } from "@/lib/appsConfig";
 import * as qbo from "@/lib/quickbooks";
+import { buildLeadsHubHeaders } from "@/lib/leadshubHeaders";
 import fs from 'fs';
 import path from 'path';
 
@@ -301,10 +302,29 @@ export async function testIntegration(appCode: string, serviceKey: string) {
       const leadshubUrl = process.env.LEADSHUB_URL || process.env.NEXT_PUBLIC_LEADSHUB_URL || 'https://agentes.konsul.digital';
       logs.push(`LeadsHUB (${leadshubUrl}) API v1 conectada y lista para sincronizar leads CRM, agentes IA y mensajería WhatsApp.`);
       
+      const { isAuthenticated, getUser } = getKindeServerSession();
+      const isAuth = await isAuthenticated();
+      const sessionUser = isAuth ? await getUser() : null;
+      const testReqId = `req_test_${Date.now()}`;
+
+      const lhHeaders = buildLeadsHubHeaders({
+        'Content-Type': 'application/json',
+        'x-api-key': serviceKey,
+        'x-source-app': 'leadshub',
+        'x-user-id': sessionUser?.id || '',
+        'x-user-email': sessionUser?.email || ''
+      }, {
+        source: 'manual',
+        sourceId: 'test_integration',
+        sourceName: 'Test de Conexión LeadsHUB',
+        actorEmail: sessionUser?.email || null,
+        requestId: testReqId
+      });
+
       // Check for real contacts and calendar routes
       try {
         const contRes = await fetch(`${leadshubUrl}/api/v1/contacts`, {
-          headers: { 'x-api-key': serviceKey, 'x-source-app': 'leadshub' },
+          headers: lhHeaders,
           cache: 'no-store'
         });
         if (contRes.ok) {
@@ -324,7 +344,7 @@ export async function testIntegration(appCode: string, serviceKey: string) {
         }
 
         const calRes = await fetch(`${leadshubUrl}/api/v1/calendar/events`, {
-          headers: { 'x-api-key': serviceKey, 'x-source-app': 'leadshub' },
+          headers: lhHeaders,
           cache: 'no-store'
         });
         if (calRes.ok) {
@@ -612,11 +632,20 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
       || process.env.NEXT_PUBLIC_LEADSHUB_URL 
       || 'https://agentes.konsul.digital';
     const lowerTrig = (triggerName || '').toLowerCase();
+    const lhReqId = `req_sample_${Date.now()}`;
+
+    const lhAuthHeaders = buildLeadsHubHeaders(authHeaders, {
+      source: 'sync',
+      sourceId: 'sample_trigger_data',
+      sourceName: triggerName || 'Consulta Muestra LeadsHUB',
+      actorEmail: user.email,
+      requestId: lhReqId
+    });
 
     // Eventos de Cita / Calendario
     if (lowerTrig.includes('cita') || lowerTrig.includes('reunión') || lowerTrig.includes('reunion')) {
       try {
-        const res = await fetch(`${leadshubUrl}/api/v1/calendar/events`, { headers: authHeaders, cache: 'no-store' });
+        const res = await fetch(`${leadshubUrl}/api/v1/calendar/events`, { headers: lhAuthHeaders, cache: 'no-store' });
         if (res.ok) {
           const json = await res.json();
           const events = Array.isArray(json) ? json : (json.data || json.events || []);
@@ -649,10 +678,10 @@ export async function fetchRealTriggerData(sourceApp: string, triggerIdx: number
     // Contactos / Leads
     try {
       const emailParam = user.email ? `?email=${encodeURIComponent(user.email)}` : '';
-      let res = await fetch(`${leadshubUrl}/api/v1/contacts${emailParam}`, { headers: authHeaders, cache: 'no-store' });
+      let res = await fetch(`${leadshubUrl}/api/v1/contacts${emailParam}`, { headers: lhAuthHeaders, cache: 'no-store' });
       
       if (!res.ok) {
-        res = await fetch(`${leadshubUrl}/api/v1/contacts`, { headers: authHeaders, cache: 'no-store' });
+        res = await fetch(`${leadshubUrl}/api/v1/contacts`, { headers: lhAuthHeaders, cache: 'no-store' });
       }
 
       if (res.ok) {
@@ -1097,14 +1126,20 @@ export async function fetchAppStages(appCode: string): Promise<GroupedStagesResu
         const serviceKey = integration?.serviceKey || sharedSecret;
         const isLhKey = serviceKey.startsWith('lh_live_');
 
-        const authHeaders: Record<string, string> = {
+        const authHeaders = buildLeadsHubHeaders({
           'Content-Type': 'application/json',
           'x-api-key': isLhKey ? serviceKey : sharedSecret,
           'x-user-id': user.id,
           'x-user-email': user.email || '',
           'x-source-app': 'suite',
           ...((serviceKey && !isLhKey && serviceKey !== sharedSecret) ? { 'x-workspace-id': serviceKey } : {})
-        };
+        }, {
+          source: 'sync',
+          sourceId: 'stage_sync',
+          sourceName: 'Sincronización de Estados LeadsHUB',
+          actorEmail: user.email,
+          requestId: `req_stages_${Date.now()}`
+        });
 
         const res = await fetch(`${leadshubUrl}/api/v1/contacts/status`, {
           method: 'GET',
@@ -1841,15 +1876,20 @@ export async function retryAutomationLog(logId: string) {
     const apiKey = isLiveApiKey ? rawKey : sharedSecret;
     const workspaceId = (!isLiveApiKey && rawKey !== sharedSecret && rawKey.length > 5) ? rawKey : undefined;
 
-    const lhHeaders: Record<string, string> = {
+    const retryReqId = `req_retry_${Date.now()}_${log.id}`;
+    const lhHeaders = buildLeadsHubHeaders({
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
       'x-user-id': user.id,
-      'x-user-email': user.email || ''
-    };
-    if (workspaceId) {
-      lhHeaders['x-workspace-id'] = workspaceId;
-    }
+      'x-user-email': user.email || '',
+      ...(workspaceId ? { 'x-workspace-id': workspaceId } : {})
+    }, {
+      source: 'manual',
+      sourceId: log.ruleId || 'manual_execution',
+      sourceName: log.actionName || 'Reintento Manual de Acción',
+      actorEmail: user.email,
+      requestId: retryReqId
+    });
 
     try {
       const response = await fetch(endpoint, {

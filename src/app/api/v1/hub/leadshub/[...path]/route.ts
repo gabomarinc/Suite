@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { validateSuiteApiKey, getLeadshubCredentials } from '@/lib/hubAuth';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
+import { buildLeadsHubHeaders } from '@/lib/leadshubHeaders';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -56,20 +57,25 @@ async function handleProxy(req: Request, { params }: { params: Promise<{ path: s
     }
   }
 
-  const outboundHeaders: Record<string, string> = {
+  const requestId = req.headers.get('x-request-id') || `req_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const agentId = req.headers.get('x-konsul-agent') || req.headers.get('x-agent-id') || 'grokbot';
+  const agentName = req.headers.get('x-agent-name') || 'GrokBot API Gateway';
+
+  const outboundHeaders = buildLeadsHubHeaders({
     'Content-Type': 'application/json',
     'x-api-key': creds.serviceKey,
     'x-user-id': auth.userId,
+    'x-user-email': auth.userEmail, // Para resolución de workspace en LeadsHUB
+    'x-user-name': auth.userName,
     'x-source-app': 'suite_gateway_grokbot',
-    'x-konsul-agent': 'grokbot'
-  };
-
-  if (auth.userEmail) {
-    outboundHeaders['x-user-email'] = auth.userEmail;
-  }
-  if (auth.userName) {
-    outboundHeaders['x-user-name'] = auth.userName;
-  }
+    'x-konsul-agent': agentId
+  }, {
+    source: 'ai-agent',
+    sourceId: agentId,
+    sourceName: `${agentName} (${req.method} /${targetPath})`,
+    actorEmail: auth.userEmail || null,
+    requestId: requestId
+  });
 
   const startTime = Date.now();
   let proxyStatus = 200;
@@ -128,6 +134,7 @@ async function handleProxy(req: Request, { params }: { params: Promise<{ path: s
         status: lhResponse.ok ? 'SUCCESS' : 'FAILED',
         errorDetails: lhResponse.ok ? null : `HTTP ${proxyStatus}: ${JSON.stringify(responseData).substring(0, 300)}`,
         payloadSent: {
+          requestId,
           method: req.method,
           path: targetPath,
           query: Object.fromEntries(incomingUrl.searchParams.entries()),
